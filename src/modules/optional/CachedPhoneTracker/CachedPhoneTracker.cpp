@@ -13,6 +13,8 @@
 #include "mesh/NodeDB.h"
 #include "pb_encode.h"
 #include "pb_decode.h"
+#include "NRF52Bluetooth.h"
+#include "main.h"
 
 // ---------------------------------------------------------------------------
 // Registration
@@ -52,25 +54,11 @@ void CachedPhoneTracker::setup()
 }
 
 // ---------------------------------------------------------------------------
-// isBleConnected — hysteresis-backed check
+// isBleConnected — uses real nRF52 BLE stack state, not queue-empty proxy
 // ---------------------------------------------------------------------------
 bool CachedPhoneTracker::isBleConnected()
 {
-    if (!service)
-        return false;
-
-    bool queueEmpty = service->isToPhoneQueueEmpty();
-
-    if (queueEmpty) {
-        empty_polls++;
-        if (empty_polls >= 2)
-            return true;
-    } else {
-        empty_polls = 0;
-        return false;
-    }
-
-    return false;
+    return (nrf52Bluetooth != nullptr && nrf52Bluetooth->isConnected());
 }
 
 // ---------------------------------------------------------------------------
