@@ -50,7 +50,6 @@ class CachedPhoneTracker : public MeshModule, protected concurrency::OSThread
     uint16_t cache_tail = 0;
     uint32_t last_flush_check_ms = 0;
     bool was_ble_connected = false;
-    uint8_t empty_polls = 0;  // hysteresis for BLE reconnect detection
 
     // --- Methods ---
     bool isBleConnected();
