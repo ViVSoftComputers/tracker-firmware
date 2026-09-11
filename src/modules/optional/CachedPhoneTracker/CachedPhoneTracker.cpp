@@ -85,9 +85,10 @@ int32_t CachedPhoneTracker::runOnce()
         return POLL_INTERVAL_MS;
     }
 
-    if (!gps->hasLock()) {
-        return POLL_INTERVAL_MS;
-    }
+    // IMPORTANT: Do NOT gate on gps->hasLock() here.
+    // On the T1000-E's tiny GPS antenna, the lock flag drops between
+    // acquisition cycles even though gps->p still holds valid fix data.
+    // We check non-zero coordinates instead.
 
     int32_t lat_i = gps->p.latitude_i;
     int32_t lon_i = gps->p.longitude_i;
