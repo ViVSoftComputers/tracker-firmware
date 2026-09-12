@@ -22,6 +22,10 @@ class CachedPhoneTracker : public MeshModule, protected concurrency::OSThread
     CachedPhoneTracker();
     void setup();
 
+    /// 4-click toggle: enter/exit aggressive GPS tracking mode
+    static void toggleTrackerMode();
+    static bool isTrackerModeActive();
+
   protected:
     virtual bool wantPacket(const meshtastic_MeshPacket *p) override { return false; }
     virtual int32_t runOnce() override;
@@ -42,6 +46,9 @@ class CachedPhoneTracker : public MeshModule, protected concurrency::OSThread
     int32_t last_lon_i = 0;
     uint32_t last_capture_ms = 0;
     uint32_t point_count = 0;
+
+    // --- Tracker mode state ---
+    static bool trackerModeActive;
 
     // --- Cache state ---
     uint16_t cache_count = 0;

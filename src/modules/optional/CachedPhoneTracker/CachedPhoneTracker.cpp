@@ -15,6 +15,36 @@
 #include "pb_decode.h"
 #include "NRF52Bluetooth.h"
 #include "main.h"
+#include "buzz.h"
+
+// ---------------------------------------------------------------------------
+// Tracker mode state (4-click toggle)
+// ---------------------------------------------------------------------------
+bool CachedPhoneTracker::trackerModeActive = false;
+
+void CachedPhoneTracker::toggleTrackerMode()
+{
+    trackerModeActive = !trackerModeActive;
+
+    if (trackerModeActive) {
+        // ENTER tracker mode: LED solid on, ascending melody
+        pinMode(PIN_LED1, OUTPUT);
+        digitalWrite(PIN_LED1, LED_STATE_ON);
+        play4ClickUp();
+        LOG_INFO("CachedPhoneTracker: tracker mode ON (GPS aggressive, LED solid)\n");
+    } else {
+        // EXIT tracker mode: LED off, descending melody, return to Meshtastic normal
+        digitalWrite(PIN_LED1, !LED_STATE_ON);
+        ledOff(PIN_LED1);
+        play4ClickDown();
+        LOG_INFO("CachedPhoneTracker: tracker mode OFF (Meshtastic normal)\n");
+    }
+}
+
+bool CachedPhoneTracker::isTrackerModeActive()
+{
+    return trackerModeActive;
+}
 
 // ---------------------------------------------------------------------------
 // Registration
@@ -66,6 +96,11 @@ bool CachedPhoneTracker::isBleConnected()
 // ---------------------------------------------------------------------------
 int32_t CachedPhoneTracker::runOnce()
 {
+    // --- Tracker mode OFF: do nothing, let Meshtastic operate normally ---
+    if (!trackerModeActive) {
+        return POLL_INTERVAL_MS;
+    }
+
     bool bleConnected = isBleConnected();
 
     // --- BLE reconnected → flush the cache ---
@@ -100,8 +135,7 @@ int32_t CachedPhoneTracker::runOnce()
     // We re-enter every poll and re-enable, so stale scheduling
     // (consecutiveFailures → position_broadcast_secs backoff)
     // cannot park us in HARDSLEEP for minutes.
-    static uint32_t lastEnableMs = 0;
-    if (millis() - lastEnableMs < 3000) {
+    static uint32_t lastEnableMs = 0;n    if (millis() - lastEnableMs < 3000) {
         return 3000;
     }
     lastEnableMs = millis();
@@ -148,6 +182,12 @@ int32_t CachedPhoneTracker::runOnce()
         last_capture_ms = now;
         point_count++;
 
+        // --- Feedback: LED pulse-off + beep on capture ---
+        digitalWrite(PIN_LED1, !LED_STATE_ON);
+        playBeep();
+        delay(80);
+        digitalWrite(PIN_LED1, LED_STATE_ON);
+
         LOG_DEBUG("CachedPhoneTracker: pt #%u lat=%.6f lon=%.6f alt=%d (ring %u/%u)\n",
                   point_count,
                   lat_i * 1e-7, lon_i * 1e-7,
@@ -155,7 +195,7 @@ int32_t CachedPhoneTracker::runOnce()
                   cache_count, MAX_CACHED_POSITIONS);
     }
 
-    return POLL_INTERVAL_MS;
+    return POLL_INTERPOLL_INTERVAL_MS;
 }
 
 // ---------------------------------------------------------------------------
@@ -207,9 +247,9 @@ void CachedPhoneTracker::appendToCache(const meshtastic_Position &pos)
 
     // 4. Protobuf payload + zero-pad to fixed slot width
     f.write(pb_buf, pb_len);
-    uint16_t padding = meshtastic_Position_size - pb_len;
-    for (uint16_t i = 0; i < padding; i++) {
-        f.write((uint8_t)0);
+    uin16_t padding = meshtastic_Position_size - pb_len;
+    for (uin16_t i = 0; i < padding; i++) {
+        f.write((uin8_t)0);
     }
 
     // 5. CRC16 placeholder
@@ -221,9 +261,9 @@ void CachedPhoneTracker::appendToCache(const meshtastic_Position &pos)
     if (cache_count < MAX_CACHED_POSITIONS) {
         cache_count++;
     }
-    cache_head = (cache_head + 1) % MAX_CACHED_POSITIONS;
+    cache_head = (cache_head +1) % MAX_CACHED_POSITIONS;
     if (cache_count >= MAX_CACHED_POSITIONS) {
-        cache_tail = (cache_tail + 1) % MAX_CACHED_POSITIONS;
+        cache_tail = (cache_tail +1) % MAX_CACHED_POSITIONS;
     }
 
     saveCacheIndex();
@@ -232,16 +272,15 @@ void CachedPhoneTracker::appendToCache(const meshtastic_Position &pos)
 // ---------------------------------------------------------------------------
 // readCachedEntry
 // ---------------------------------------------------------------------------
-bool CachedPhoneTracker::readCachedEntry(uint16_t index, meshtastic_Position &pos, uint32_t &timestamp)
+bool CachedPhoneTracker::readCachedEntry(uin16_t index, meshtastic_Position &pos, uin32_t &timestamp)
 {
     if (!FSCom.exists(CACHE_PATH))
         return false;
 
-    File f = FSCom.open(CACHE_PATH, FILE_O_READ);
-    if (!f)
+    File f = FSCom.open(CACHE_PATH, FILE_O_READ);n    if (!f)
         return false;
 
-    uint32_t slotSize = ENTRY_HEADER_SIZE + meshtastic_Position_size + 2;
+    uint32_t slotSize = ENTRY_HADER_SIZE + meshtastic_Position_size +2;
     f.seek(index * slotSize);
 
     uint8_t header[ENTRY_HEADER_SIZE];
