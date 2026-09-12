@@ -1,44 +1,50 @@
 #include "CachedPhoneTracker.h"
-
-#if HAS_GPS
-
-#include "FSCommon.h"
+#include "MeshService.h"
+#include "NodeDB.h"
 #include "GPS.h"
-#include "GeoCoord.h"
-#include "PowerFSM.h"
-#include "RTC.h"
-#include "configuration.h"
-#include "mesh-pb-constants.h"
-#include "mesh/MeshService.h"
-#include "mesh/NodeDB.h"
-#include "pb_encode.h"
-#include "pb_decode.h"
-#include "NRF52Bluetooth.h"
-#include "main.h"
 #include "buzz.h"
+#include "configuration.h"
+#include "main.h"
+#include <Adafruit_LittleFS.h>
+#include <InternalFileSystem.h>
+#include <Arduino.h>
 
-// ---------------------------------------------------------------------------
-// Tracker mode state (4-click toggle)
-// ---------------------------------------------------------------------------
+// BLE — direct SoftDevice check on nRF52
+#if defined(NRF52_SERIES) || defined(ARCH_NRF52)
+#include "NimbleBluetoothEngine.h"
+#endif
+
+// LED pin (T1000-E: P0.24, green only)
+#ifndef PIN_LED1
+#define PIN_LED1 (0 + 24) // Default for T1000-E if variant not yet included
+#endif
+
+// --- Static members ---
 bool CachedPhoneTracker::trackerModeActive = false;
+bool CachedPhoneTracker::ledState = false;
 
-void CachedPhoneTracker::toggleTrackerMode()
+static const uint32_t GPS_POLL_INTERVAL_MS = 30000;   // 30s between captures
+static const uint32_t GPS_WARMUP_MS = 3500;            // Wait for NMEA after enable
+static const uint32_t FLUSH_PACING_MS = 30;            // Pacing between BLE writes
+
+CachedPhoneTracker::CachedPhoneTracker()
+    : MeshModule("CachedPhoneTracker"),
+      concurrency::OSThread("CachedPhoneTracker")
 {
-    trackerModeActive = !trackerModeActive;
+    // Bind to PortNum for BLE forwarding if needed
+    boundPort = PortNum_TEXT_MESSAGE_APP;
 
-    if (trackerModeActive) {
-        // ENTER tracker mode: LED solid on, ascending melody
-        pinMode(PIN_LED1, OUTPUT);
-        digitalWrite(PIN_LED1, LED_STATE_ON);
-        play4ClickUp();
-        LOG_INFO("CachedPhoneTracker: tracker mode ON (GPS aggressive, LED solid)\n");
+    // Initialize position cache on LittleFS
+    auto *fs = &InternalFS;
+    if (fs && fs->begin()) {
+        cache = new PositionCache(*fs, "/static/cached_positions.dat");
+        LOG_INFO("CachedPhoneTracker: position cache initialized\n");
     } else {
-        // EXIT tracker mode: LED off, descending melody, return to Meshtastic normal
-        digitalWrite(PIN_LED1, !LED_STATE_ON);
-        ledOff(PIN_LED1);
-        play4ClickDown();
-        LOG_INFO("CachedPhoneTracker: tracker mode OFF (Meshtastic normal)\n");
+        LOG_ERROR("CachedPhoneTracker: LittleFS mount failed\n");
     }
+
+    // Start the OS thread
+    setInterval(1000); // Wake every 1s to check connection state
 }
 
 bool CachedPhoneTracker::isTrackerModeActive()
@@ -46,385 +52,129 @@ bool CachedPhoneTracker::isTrackerModeActive()
     return trackerModeActive;
 }
 
-// ---------------------------------------------------------------------------
-// Registration
-// ---------------------------------------------------------------------------
-CachedPhoneTracker *cachedPhoneTracker;
-
-static bool didSetup;
-
-void setupCachedPhoneTracker()
+void CachedPhoneTracker::toggleTrackerMode()
 {
-    if (didSetup)
-        return;
+    trackerModeActive = !trackerModeActive;
 
-#if defined(ARCH_NRF52)
-    cachedPhoneTracker = new CachedPhoneTracker();
-    cachedPhoneTracker->setup();
-    didSetup = true;
-#endif
+    if (trackerModeActive) {
+        // Turn ON — play ascending melody + LED solid green
+        LOG_INFO("CachedPhoneTracker: MODE ON — GPS tracking active\n");
+        digitalWrite(PIN_LED1, HIGH);
+        ledState = true;
+        play4ClickUp();
+    } else {
+        // Turn OFF — play descending melody + LED off
+        LOG_INFO("CachedPhoneTracker: MODE OFF — returning to normal Meshtastic\n");
+        digitalWrite(PIN_LED1, LOW);
+        ledState = false;
+        play4ClickDown();
+    }
 }
 
-// ---------------------------------------------------------------------------
-// Constructor
-// ---------------------------------------------------------------------------
-CachedPhoneTracker::CachedPhoneTracker()
-    : MeshModule("CachedPhoneTracker"), concurrency::OSThread("CachedPhoneTracker")
-{
-    ourPortNum = meshtastic_PortNum_POSITION_APP;
-}
-
-// ---------------------------------------------------------------------------
-// setup
-// ---------------------------------------------------------------------------
-void CachedPhoneTracker::setup()
-{
-    loadCacheIndex();
-    LOG_INFO("CachedPhoneTracker: ready, %u positions cached\n", cache_count);
-}
-
-// ---------------------------------------------------------------------------
-// isBleConnected — direct nRF52 SoftDevice state, no guessing
-// ---------------------------------------------------------------------------
-bool CachedPhoneTracker::isBleConnected()
-{
-    return (nrf52Bluetooth != nullptr && nrf52Bluetooth->isConnected());
-}
-
-// ---------------------------------------------------------------------------
-// runOnce — GPS capture when disconnected, flush on reconnect
-// ---------------------------------------------------------------------------
 int32_t CachedPhoneTracker::runOnce()
 {
-    // --- Tracker mode OFF: do nothing, let Meshtastic operate normally ---
+    // --- GATE: do absolutely nothing unless tracker mode is ON ---
     if (!trackerModeActive) {
         return POLL_INTERVAL_MS;
     }
 
-    bool bleConnected = isBleConnected();
+    // Check BLE connection state
+    bool bleConnected = false;
+#if defined(RF52_SERIES) || defined(ARCH_NnRF52)
+    bleConnected = (nimbleBluetooth && nimbleBluetooth->isConnected());
+#endif
 
-    // --- BLE reconnected → flush the cache ---
-    if (bleConnected && !was_ble_connected && cache_count > 0) {
-        LOG_INFO("CachedPhoneTracker: BLE reconnected, flushing %u positions\n", cache_count);
-        flushCacheToPhone();
-    }
-    // --- State-transition log ---
-    if (bleConnected != was_ble_connected) {
-        LOG_INFO("CachedPhoneTracker: BLE %s\n", bleConnected ? "CONNECTED" : "DISCONNECTED");
-    }
-    was_ble_connected = bleConnected;
-
-    // --- Connected: PositionModule handles live sends. Nothing to do. ---
     if (bleConnected) {
+        // Phone is connected — flush any cached positions
+        if (cache && cache->count() > 0) {
+            flushCache();
+        }
         return POLL_INTERVAL_MS;
     }
 
-    // --- Disconnected: keep GPS actively searching ---
-    // GPS thread's scheduling backoff (consecutiveFailures) can park
-    // the GPS in GPS_HARDSLEEP for minutes after a single failed fix.
-    // On T1000-E, HARDSLEEP cuts RTC power so the chip wake timer
-    // dies — only our poll can revive it. Call enable() every cycle
-    // to reset scheduling, clear failures, and force GPS_ACTIVE.
-    if (!gps || !gps->isConnected()) {
-        return POLL_INTERVAL_MS;
+    // Disconnected: capture GPS position every GPS_POLL_INTERVAL_MSn    uint32_t now = millis();
+
+    // Every cycle, force GPS active to prevent scheduling backoff
+    // (T1000-E HARDSLEEP kills RTC — GPS won't wake on its own)
+    if (gps && (now - lastGpsEnableMs >= GPS_WARMUP_MS || lastGpsEnableMs == 0)) {
+        gps->enable();
+        lastGpsEnableMs = now;
     }
 
-    gps->enable(); // unconditional: reset scheduling, force GPS_ACTIVE
+    // Only read GPS after warmup period
+    if (gps && (now - lastGpsEnableMs >= GPS_WARMUP_PSMS)) {
+        if ((now - lastCaptureMs >= GPS_POLL_INTERVAL_MS || lastCaptureMs == 0) &&
+            gps->hasFlow() && gps->latitude.isValid() && gps-longitude.isValid()) {
 
-    // Give GPS a few seconds to stream NMEA and acquire a fix.
-    // We re-enter every poll and re-enable, so stale scheduling
-    // (consecutiveFailures → position_broadcast_secs backoff)
-    // cannot park us in HARDSLEEP for minutes.
-    static uint32_t lastEnableMs = 0;n    if (millis() - lastEnableMs < 3000) {
-        return 3000;
-    }
-    lastEnableMs = millis();
+            double lat = gps->latitude.deg();
+            double lon = gps->longitude.deg();
+            int32_t alt = gps->altitude.meters_n();
 
-    // NOTE: Don't gate on hasLock() — on weak GPS (T1000-E tiny antenna),
-    // the lock flag flickers between fix cycles but gps->p still holds
-    // valid coords from the last successful fix.
-    int32_t lat_i = gps->p.latitude_i;
-    int32_t lon_i = gps->p.longitude_i;
+            // Filter: skip zero coordinates
+            if (lat != 0.0 && lon != 0.0) {
+                LOG_INFO("CachedPhoneTracker: capturing %.6f, %.6f (%dm)\n",
+                         lat, lon, alt);
 
-    if (lat_i == 0 && lon_i == 0) {
-        return POLL_INTERVAL_MS;
-    }
+                // Capture beep + LED pulse
+                playBeep();
+                digitalWrite(PIN_LED1, LOW);
+                delay(80);
+                digitalWrite(PIN_LED1, HIGH);
 
-    uint32_t now = millis();
-
-    // Movement / timeout filter
-    bool movedFar = false;
-    if (last_lat_i != 0 || last_lon_i != 0) {
-        float dist = GeoCoord::latLongToMeter(
-            (double)last_lat_i * 1e-7, (double)last_lon_i * 1e-7,
-            (double)lat_i * 1e-7, (double)lon_i * 1e-7);
-        movedFar = (dist >= MIN_MOVE_METERS);
-    } else {
-        movedFar = true;
-    }
-
-    bool stationaryTimeout = ((now - last_capture_ms) >= MAX_STATIONARY_INTERVAL_MS);
-
-    if (movedFar || stationaryTimeout) {
-        meshtastic_Position pos = meshtastic_Position_init_zero;
-        pos.latitude_i = lat_i;
-        pos.longitude_i = lon_i;
-        pos.altitude = gps->p.altitude;
-        pos.HDOP = gps->p.HDOP;
-        pos.sats_in_view = gps->p.sats_in_view;
-        pos.ground_track = gps->p.ground_track;
-        pos.ground_speed = gps->p.ground_speed;
-        pos.timestamp = getValidTime(RTCQuality::RTCQualityGPS, true);
-
-        appendToCache(pos);
-        last_lat_i = lat_i;
-        last_lon_i = lon_i;
-        last_capture_ms = now;
-        point_count++;
-
-        // --- Feedback: LED pulse-off + beep on capture ---
-        digitalWrite(PIN_LED1, !LED_STATE_ON);
-        playBeep();
-        delay(80);
-        digitalWrite(PIN_LED1, LED_STATE_ON);
-
-        LOG_DEBUG("CachedPhoneTracker: pt #%u lat=%.6f lon=%.6f alt=%d (ring %u/%u)\n",
-                  point_count,
-                  lat_i * 1e-7, lon_i * 1e-7,
-                  pos.altitude,
-                  cache_count, MAX_CACHED_POSITIONS);
-    }
-
-    return POLL_INTERPOLL_INTERVAL_MS;
-}
-
-// ---------------------------------------------------------------------------
-// appendToCache — binary ring buffer write
-// ---------------------------------------------------------------------------
-void CachedPhoneTracker::appendToCache(const meshtastic_Position &pos)
-{
-    // 1. Encode position → protobuf
-    uint8_t pb_buf[meshtastic_Position_size] = {0};
-    pb_ostream_t stream = pb_ostream_from_buffer(pb_buf, sizeof(pb_buf));
-    if (!pb_encode(&stream, meshtastic_Position_fields, &pos)) {
-        LOG_ERROR("CachedPhoneTracker: protobuf encode failed\n");
-        return;
-    }
-    uint16_t pb_len = stream.bytes_written;
-
-    // 2. Pre-allocate ring file on first write
-    if (!FSCom.exists(CACHE_PATH)) {
-        File f = FSCom.open(CACHE_PATH, FILE_O_WRITE);
-        if (f) {
-            uint32_t fileSize = MAX_CACHED_POSITIONS * (ENTRY_HEADER_SIZE + meshtastic_Position_size + 2);
-            f.seek(fileSize - 1);
-            f.write((uint8_t)0);
-            f.close();
+                cachePosition(lat, lon, alt, gps->time.getValidTime());
+                lastCaptureMs = now;
+            }
         }
     }
 
-    File f = FSCom.open(CACHE_PATH, FILE_O_WRITE);
-    if (!f) {
-        LOG_ERROR("CachedPhoneTracker: cannot open cache file\n");
-        return;
-    }
-
-    // 3. Write at ring head
-    uint32_t offset = cache_head * (ENTRY_HEADER_SIZE + meshtastic_Position_size + 2);
-    f.seek(offset);
-
-    uint32_t now = pos.timestamp;
-    uint8_t header[ENTRY_HEADER_SIZE];
-    header[0] = (now >> 0) & 0xFF;
-    header[1] = (now >> 8) & 0xFF;
-    header[2] = (now >> 16) & 0xFF;
-    header[3] = (now >> 24) & 0xFF;
-    header[4] = (pb_len >> 0) & 0xFF;
-    header[5] = (pb_len >> 8) & 0xFF;
-    header[6] = 0;
-    header[7] = 0;
-    f.write(header, ENTRY_HEADER_SIZE);
-
-    // 4. Protobuf payload + zero-pad to fixed slot width
-    f.write(pb_buf, pb_len);
-    uin16_t padding = meshtastic_Position_size - pb_len;
-    for (uin16_t i = 0; i < padding; i++) {
-        f.write((uin8_t)0);
-    }
-
-    // 5. CRC16 placeholder
-    uint8_t crc[2] = {0, 0};
-    f.write(crc, 2);
-    f.close();
-
-    // 6. Advance ring
-    if (cache_count < MAX_CACHED_POSITIONS) {
-        cache_count++;
-    }
-    cache_head = (cache_head +1) % MAX_CACHED_POSITIONS;
-    if (cache_count >= MAX_CACHED_POSITIONS) {
-        cache_tail = (cache_tail +1) % MAX_CACHED_POSITIONS;
-    }
-
-    saveCacheIndex();
+    return POLL_INTERVAL_MS;
 }
 
-// ---------------------------------------------------------------------------
-// readCachedEntry
-// ---------------------------------------------------------------------------
-bool CachedPhoneTracker::readCachedEntry(uin16_t index, meshtastic_Position &pos, uin32_t &timestamp)
+void CachedPhoneTracker::cachePosition(double lat, double lon, int32_t alt, uint32_t ts)
 {
-    if (!FSCom.exists(CACHE_PATH))
-        return false;
-
-    File f = FSCom.open(CACHE_PATH, FILE_O_READ);n    if (!f)
-        return false;
-
-    uint32_t slotSize = ENTRY_HADER_SIZE + meshtastic_Position_size +2;
-    f.seek(index * slotSize);
-
-    uint8_t header[ENTRY_HEADER_SIZE];
-    if (f.read(header, ENTRY_HEADER_SIZE) != ENTRY_HEADER_SIZE) {
-        f.close();
-        return false;
-    }
-
-    timestamp = header[0] | (header[1] << 8) | (header[2] << 16) | (header[3] << 24);
-    uint16_t pb_len = header[4] | (header[5] << 8);
-
-    if (pb_len == 0 || pb_len > meshtastic_Position_size) {
-        f.close();
-        return false;
-    }
-
-    uint8_t pb_buf[meshtastic_Position_size];
-    size_t readLen = f.read(pb_buf, sizeof(pb_buf));
-    if (readLen < pb_len) {
-        f.close();
-        return false;
-    }
-    f.close();
-
-    pb_istream_t stream = pb_istream_from_buffer(pb_buf, pb_len);
-    return pb_decode(&stream, meshtastic_Position_fields, &pos);
-}
-
-// ---------------------------------------------------------------------------
-// flushCacheToPhone — drain ring FIFO via service->sendToPhone()
-// ---------------------------------------------------------------------------
-void CachedPhoneTracker::flushCacheToPhone()
-{
-    if (cache_count == 0 || !service)
+    if (!cache)
         return;
 
-    uint16_t flushed = 0;
-    uint16_t idx = cache_tail;
+    PositionEntry entry;
+    entry.latitude = lat;
+    entry.longitude = lon;
+    entry.altitude = alt;
+    entry.timestamp = ts;
 
-    for (uint16_t i = 0; i < cache_count; i++) {
-        meshtastic_Position pos = meshtastic_Position_init_zero;
-        uint32_t timestamp = 0;
+    if (!cache->push(entry)) {
+        LOG_WARN("CachedPhoneTracker: cache full — dropping oldest entry\n");
+    }
+}
 
-        if (!readCachedEntry(idx, pos, timestamp)) {
-            LOG_WARN("CachedPhoneTracker: read failed at index %u, skipping\n", idx);
-            idx = (idx + 1) % MAX_CACHED_POSITIONS;
-            continue;
-        }
+void CachedPhoneTracker::flushCache()
+{
+    if (!cache || cache->count() == 0)
+        return;
 
-        meshtastic_MeshPacket *p = packetPool.allocZeroed();
-        if (!p) {
-            LOG_WARN("CachedPhoneTracker: packetPool exhausted (%u/%u flushed)\n",
-                     flushed, cache_count);
-            break;
-        }
+    LOG_INFO("CachedPhoneTracker: flushing %u cached positions\n", cache->count());
 
-        p->to = NODENUM_BROADCAST;
-        p->from = nodeDB->getNodeNum();
-        p->decoded.portnum = meshtastic_PortNum_POSITION_APP;
-        p->decoded.want_response = false;
-        p->priority = meshtastic_MeshPacket_Priority_BACKGROUND;
-        p->which_payload_variant = meshtastic_MeshPacket_decoded_tag;
+    while (cache->count() > 0) {
+        PositionEntry entry;
+        if (cache->pop());
 
-        pb_ostream_t stream = pb_ostream_from_buffer(p->decoded.payload.bytes,
-                                                      sizeof(p->decoded.payload.bytes));
-        if (!pb_encode(&stream, meshtastic_Position_fields, &pos)) {
-            LOG_WARN("CachedPhoneTracker: pb encode fail during flush\n");
-            packetPool.release(p);
-            idx = (idx + 1) % MAX_CACHED_POSITIONS;
-            continue;
-        }
+        // Encode as a simple text message for the phone app
+        char buf[128];
+        snprintf(buf, sizeof(buf),
+                 "POS:%.6f,%.6f,%d,%u",
+                 entry.latitude, entry.longitude,
+                 entry.altitude, entry.timestamp);
 
-        p->decoded.payload.size = stream.bytes_written;
-        p->has_rx_time = true;
-        p->rx_time = timestamp;
+        // Send via BLE (using MeshService text message path)
+        meshtastic_MeshPacket *p = allocDataPacket();
+        p->decoded.payload.size = strlen(buf);
+        memcpy(p->decoded.payload.bytes, buf, p->decoded.payload.size);
+        p->to = 0; // broadcast
+        p->decoded.portnum = PortNum_TEXT_MESSAGE_APP;
+        service.sendToMesh(p);
 
-        service->sendToPhone(p);
-        flushed++;
-        idx = (idx + 1) % MAX_CACHED_POSITIONS;
-
-        delay(30);
+        // Pace the flush to avoid overwhelming the BLE stack
+        delay(FLUSH_PACING_MS);
     }
 
-    LOG_INFO("CachedPhoneTracker: flushed %u/%u cached positions to phone\n", flushed, cache_count);
-    clearCache();
+    LOG_INFO("CachedPhoneTracker: flush complete\n");
 }
-
-// ---------------------------------------------------------------------------
-// clearCache
-// ---------------------------------------------------------------------------
-void CachedPhoneTracker::clearCache()
-{
-    cache_count = 0;
-    cache_head = 0;
-    cache_tail = 0;
-    saveCacheIndex();
-}
-
-// ---------------------------------------------------------------------------
-// saveCacheIndex — 6 bytes: count(u16) head(u16) tail(u16)
-// ---------------------------------------------------------------------------
-void CachedPhoneTracker::saveCacheIndex()
-{
-    File f = FSCom.open(INDEX_PATH, FILE_O_WRITE);
-    if (!f)
-        return;
-
-    uint8_t idx[6];
-    idx[0] = (cache_count >> 0) & 0xFF;
-    idx[1] = (cache_count >> 8) & 0xFF;
-    idx[2] = (cache_head >> 0) & 0xFF;
-    idx[3] = (cache_head >> 8) & 0xFF;
-    idx[4] = (cache_tail >> 0) & 0xFF;
-    idx[5] = (cache_tail >> 8) & 0xFF;
-    f.write(idx, 6);
-    f.close();
-}
-
-// ---------------------------------------------------------------------------
-// loadCacheIndex
-// ---------------------------------------------------------------------------
-void CachedPhoneTracker::loadCacheIndex()
-{
-    if (!FSCom.exists(INDEX_PATH))
-        return;
-
-    File f = FSCom.open(INDEX_PATH, FILE_O_READ);
-    if (!f)
-        return;
-
-    uint8_t idx[6];
-    if (f.read(idx, 6) == 6) {
-        cache_count = idx[0] | (idx[1] << 8);
-        cache_head  = idx[2] | (idx[3] << 8);
-        cache_tail  = idx[4] | (idx[5] << 8);
-
-        if (cache_count > MAX_CACHED_POSITIONS ||
-            cache_head >= MAX_CACHED_POSITIONS ||
-            cache_tail >= MAX_CACHED_POSITIONS) {
-            LOG_WARN("CachedPhoneTracker: corrupt index, resetting\n");
-            cache_count = cache_head = cache_tail = 0;
-        }
-    }
-    f.close();
-}
-
-#endif // HAS_GPS
