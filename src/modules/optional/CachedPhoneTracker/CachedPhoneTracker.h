@@ -42,13 +42,11 @@ class CachedPhoneTracker : public MeshModule, protected concurrency::OSThread
     int32_t last_lon_i = 0;
     uint32_t last_capture_ms = 0;
     uint32_t point_count = 0;
-    bool gps_has_lock = false;
 
     // --- Cache state ---
     uint16_t cache_count = 0;
     uint16_t cache_head = 0;
     uint16_t cache_tail = 0;
-    uint32_t last_flush_check_ms = 0;
     bool was_ble_connected = false;
 
     // --- Methods ---
