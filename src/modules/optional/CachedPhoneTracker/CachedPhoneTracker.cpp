@@ -54,7 +54,7 @@ void CachedPhoneTracker::setup()
 }
 
 // ---------------------------------------------------------------------------
-// isBleConnected — uses real nRF52 BLE stack state, not queue-empty proxy
+// isBleConnected — direct nRF52 SoftDevice state, no guessing
 // ---------------------------------------------------------------------------
 bool CachedPhoneTracker::isBleConnected()
 {
@@ -73,6 +73,10 @@ int32_t CachedPhoneTracker::runOnce()
         LOG_INFO("CachedPhoneTracker: BLE reconnected, flushing %u positions\n", cache_count);
         flushCacheToPhone();
     }
+    // --- State-transition log ---
+    if (bleConnected != was_ble_connected) {
+        LOG_INFO("CachedPhoneTracker: BLE %s\n", bleConnected ? "CONNECTED" : "DISCONNECTED");
+    }
     was_ble_connected = bleConnected;
 
     // --- Connected: PositionModule handles live sends. Nothing to do. ---
@@ -80,16 +84,25 @@ int32_t CachedPhoneTracker::runOnce()
         return POLL_INTERVAL_MS;
     }
 
-    // --- Disconnected: capture GPS for later ---
+    // --- Disconnected: ensure GPS stays powered on ---
+    // On cold boot without a phone, PositionModule never wakes the GPS.
+    // It starts in GPS_OFF/GPS_HARDSLEEP and only enters GPS_ACTIVE when
+    // the phone app requests position updates. We force-enable it so
+    // gps->p has fresh NMEA data at every poll.
     if (!gps || !gps->isConnected()) {
         return POLL_INTERVAL_MS;
     }
 
-    // IMPORTANT: Do NOT gate on gps->hasLock() here.
-    // On the T1000-E's tiny GPS antenna, the lock flag drops between
-    // acquisition cycles even though gps->p still holds valid fix data.
-    // We check non-zero coordinates instead.
+    if (!gps->isEnabled()) {
+        LOG_INFO("CachedPhoneTracker: forcing GPS enable (no phone connected)\n");
+        gps->enable();
+        // Give GPS time to wake, start NMEA streaming, and get a fix
+        return 5000;
+    }
 
+    // NOTE: Don't gate on hasLock() — on weak GPS (T1000-E tiny antenna),
+    // the lock flag flickers between fix cycles but gps->p still holds
+    // valid coords from the last successful fix.
     int32_t lat_i = gps->p.latitude_i;
     int32_t lon_i = gps->p.longitude_i;
 
