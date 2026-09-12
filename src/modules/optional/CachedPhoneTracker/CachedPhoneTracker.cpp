@@ -84,21 +84,27 @@ int32_t CachedPhoneTracker::runOnce()
         return POLL_INTERVAL_MS;
     }
 
-    // --- Disconnected: ensure GPS stays powered on ---
-    // On cold boot without a phone, PositionModule never wakes the GPS.
-    // It starts in GPS_OFF/GPS_HARDSLEEP and only enters GPS_ACTIVE when
-    // the phone app requests position updates. We force-enable it so
-    // gps->p has fresh NMEA data at every poll.
+    // --- Disconnected: keep GPS actively searching ---
+    // GPS thread's scheduling backoff (consecutiveFailures) can park
+    // the GPS in GPS_HARDSLEEP for minutes after a single failed fix.
+    // On T1000-E, HARDSLEEP cuts RTC power so the chip wake timer
+    // dies — only our poll can revive it. Call enable() every cycle
+    // to reset scheduling, clear failures, and force GPS_ACTIVE.
     if (!gps || !gps->isConnected()) {
         return POLL_INTERVAL_MS;
     }
 
-    if (!gps->isEnabled()) {
-        LOG_INFO("CachedPhoneTracker: forcing GPS enable (no phone connected)\n");
-        gps->enable();
-        // Give GPS time to wake, start NMEA streaming, and get a fix
-        return 5000;
+    gps->enable(); // unconditional: reset scheduling, force GPS_ACTIVE
+
+    // Give GPS a few seconds to stream NMEA and acquire a fix.
+    // We re-enter every poll and re-enable, so stale scheduling
+    // (consecutiveFailures → position_broadcast_secs backoff)
+    // cannot park us in HARDSLEEP for minutes.
+    static uint32_t lastEnableMs = 0;
+    if (millis() - lastEnableMs < 3000) {
+        return 3000;
     }
+    lastEnableMs = millis();
 
     // NOTE: Don't gate on hasLock() — on weak GPS (T1000-E tiny antenna),
     // the lock flag flickers between fix cycles but gps->p still holds
