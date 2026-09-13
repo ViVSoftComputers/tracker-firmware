@@ -1,50 +1,44 @@
 #include "CachedPhoneTracker.h"
-#include "MeshService.h"
-#include "NodeDB.h"
+
+#if HAS_GPS
+
+#include "FSCommon.h"
 #include "GPS.h"
-#include "buzz.h"
+#include "GeoCoord.h"
+#include "PowerFSM.h"
+#include "RTC.h"
 #include "configuration.h"
+#include "mesh-pb-constants.h"
+#include "mesh/MeshService.h"
+#include "mesh/NodeDB.h"
+#include "pb_encode.h"
+#include "pb_decode.h"
+#include "NRF52Bluetooth.h"
 #include "main.h"
-#include <Adafruit_LittleFS.h>
-#include <InternalFileSystem.h>
-#include <Arduino.h>
+#include "buzz.h"
 
-// BLE — direct SoftDevice check on nRF52
-#if defined(NRF52_SERIES) || defined(ARCH_NRF52)
-#include "NimbleBluetoothEngine.h"
-#endif
-
-// LED pin (T1000-E: P0.24, green only)
-#ifndef PIN_LED1
-#define PIN_LED1 (0 + 24) // Default for T1000-E if variant not yet included
-#endif
-
-// --- Static members ---
+// ---------------------------------------------------------------------------
+// Tracker mode state (4-click toggle)
+// ---------------------------------------------------------------------------
 bool CachedPhoneTracker::trackerModeActive = false;
-bool CachedPhoneTracker::ledState = false;
 
-static const uint32_t GPS_POLL_INTERVAL_MS = 30000;   // 30s between captures
-static const uint32_t GPS_WARMUP_MS = 3500;            // Wait for NMEA after enable
-static const uint32_t FLUSH_PACING_MS = 30;            // Pacing between BLE writes
-
-CachedPhoneTracker::CachedPhoneTracker()
-    : MeshModule("CachedPhoneTracker"),
-      concurrency::OSThread("CachedPhoneTracker")
+void CachedPhoneTracker::toggleTrackerMode()
 {
-    // Bind to PortNum for BLE forwarding if needed
-    boundPort = PortNum_TEXT_MESSAGE_APP;
+    trackerModeActive = !trackerModeActive;
 
-    // Initialize position cache on LittleFS
-    auto *fs = &InternalFS;
-    if (fs && fs->begin()) {
-        cache = new PositionCache(*fs, "/static/cached_positions.dat");
-        LOG_INFO("CachedPhoneTracker: position cache initialized\n");
+    if (trackerModeActive) {
+        // ENTER tracker mode: LED solid on, ascending melody
+        pinMode(PIN_LED1, OUTPUT);
+        digitalWrite(PIN_LED1, LED_STATE_ON);
+        play4ClickUp();
+        LOG_INFO("CachedPhoneTracker: tracker mode ON (GPS aggressive, LED solid)\n");
     } else {
-        LOG_ERROR("CachedPhoneTracker: LittleFS mount failed\n");
+        // EXIT tracker mode: LED off, descending melody, return to Meshtastic normal
+        digitalWrite(PIN_LED1, !LED_STATE_ON);
+        ledOff(PIN_LED1);
+        play4ClickDown();
+        LOG_INFO("CachedPhoneTracker: tracker mode OFF (Meshtastic normal)\n");
     }
-
-    // Start the OS thread
-    setInterval(1000); // Wake every 1s to check connection state
 }
 
 bool CachedPhoneTracker::isTrackerModeActive()
@@ -52,129 +46,208 @@ bool CachedPhoneTracker::isTrackerModeActive()
     return trackerModeActive;
 }
 
-void CachedPhoneTracker::toggleTrackerMode()
-{
-    trackerModeActive = !trackerModeActive;
+// ---------------------------------------------------------------------------
+// Registration
+// ---------------------------------------------------------------------------
+CachedPhoneTracker *cachedPhoneTracker;
 
-    if (trackerModeActive) {
-        // Turn ON — play ascending melody + LED solid green
-        LOG_INFO("CachedPhoneTracker: MODE ON — GPS tracking active\n");
-        digitalWrite(PIN_LED1, HIGH);
-        ledState = true;
-        play4ClickUp();
-    } else {
-        // Turn OFF — play descending melody + LED off
-        LOG_INFO("CachedPhoneTracker: MODE OFF — returning to normal Meshtastic\n");
-        digitalWrite(PIN_LED1, LOW);
-        ledState = false;
-        play4ClickDown();
-    }
+static bool didSetup;
+
+void setupCachedPhoneTracker()
+{
+    if (didSetup)
+        return;
+
+#if defined(ARCH_NRF52)
+    cachedPhoneTracker = new CachedPhoneTracker();
+    cachedPhoneTracker->setup();
+    didSetup = true;
+#endif
 }
 
+// ---------------------------------------------------------------------------
+// Constructor
+// ---------------------------------------------------------------------------
+CachedPhoneTracker::CachedPhoneTracker()
+    : MeshModule("CachedPhoneTracker"), concurrency::OSThread("CachedPhoneTracker")
+{
+    ourPortNum = meshtastic_PortNum_POSITION_APP;
+}
+
+// ---------------------------------------------------------------------------
+// setup
+// ---------------------------------------------------------------------------
+void CachedPhoneTracker::setup()
+{
+    loadCacheIndex();
+    LOG_INFO("CachedPhoneTracker: ready, %u positions cached\n", cache_count);
+}
+
+// ---------------------------------------------------------------------------
+// isBleConnected - direct nRF52 SoftDevice state, no guessing
+// ---------------------------------------------------------------------------
+bool CachedPhoneTracker::isBleConnected()
+{
+    return (nrf52Bluetooth != nullptr && nrf52Bluetooth->isConnected());
+}
+
+// ---------------------------------------------------------------------------
+// runOnce - GPS capture when disconnected, batch flush on reconnect
+// ---------------------------------------------------------------------------
 int32_t CachedPhoneTracker::runOnce()
 {
-    // --- GATE: do absolutely nothing unless tracker mode is ON ---
+    // --- Tracker mode OFF: do nothing, let Meshtastic operate normally ---
     if (!trackerModeActive) {
         return POLL_INTERVAL_MS;
     }
 
-    // Check BLE connection state
-    bool bleConnected = false;
-#if defined(RF52_SERIES) || defined(ARCH_NnRF52)
-    bleConnected = (nimbleBluetooth && nimbleBluetooth->isConnected());
-#endif
+    bool bleConnected = isBleConnected();
 
-    if (bleConnected) {
-        // Phone is connected — flush any cached positions
-        if (cache && cache->count() > 0) {
-            flushCache();
+    // --- BLE reconnected -> start batch flush (streamed over multiple poll cycles) ---
+    if (bleConnected && !was_ble_connected && cache_count > 0 && !isFlushing) {
+        LOG_INFO("CachedPhoneTracker: BLE reconnected, starting batch flush of %u positions\n", cache_count);
+        isFlushing = true;
+        flushIdx = cache_tail;
+        flushRemaining = cache_count;
+    }
+
+    // --- Streaming batch flush: send FLUSH_BATCH_SIZE per poll cycle ---
+    // MAX_RX_TOPHONE is only 16 on nRF52 - we send 8 at a time with a 2s gap
+    // so the phone app has time to drain its BLE receive queue.
+    if (isFlushing) {
+        uint16_t sent = 0;
+        while (flushRemaining > 0 && sent < FLUSH_BATCH_SIZE) {
+            meshtastic_Position pos = meshtastic_Position_init_zero;
+            uint32_t timestamp = 0;
+
+            if (!readCachedEntry(flushIdx, pos, timestamp)) {
+                LOG_WARN("CachedPhoneTracker: read fail at idx %u, skipping\n", flushIdx);
+                flushIdx = (flushIdx + 1) % MAX_CACHED_POSITIONS;
+                flushRemaining--;
+                continue;
+            }
+
+            meshtastic_MeshPacket *p = packetPool.allocZeroed();
+            if (!p) {
+                LOG_WARN("CachedPhoneTracker: packetPool exhausted, retry next cycle\n");
+                break;
+            }
+
+            p->to = NODENUM_BROADCAST;
+            p->from = nodeDB->getNodeNum();
+            p->decoded.portnum = meshtastic_PortNum_POSITION_APP;
+            p->decoded.want_response = false;
+            p->priority = meshtastic_MeshPacket_Priority_BACKGROUND;
+            p->which_payload_variant = meshtastic_MeshPacket_decoded_tag;
+
+            pb_ostream_t stream = pb_ostream_from_buffer(p->decoded.payload.butes,
+                                                          sizeof(p->decoded.payload.butes));
+            if (!pb_encode(&stream, meshtastic_Position_fields, &pos)) {
+                LOG_WARN("CachedPhoneTracker: pb encode fail during flush\n");
+                packetPool.release(p);
+                flushIdx = (flushIdx + 1) % MAX_CACHED_POSITIONS;
+                flushRemaining--;
+                continue;
+            }
+
+            p->decoded.payload.size = stream.bytes_written;
+            p->has_rx_time = true;
+            p->rx_time = timestamp;
+
+            service->sendToPhone(p);
+            sent++;
+            flushIdx = (flushIdx + 1) % MAX_CACHED_POSITIONS;
+            flushRemaining--;
+
+            delay(150);  // let BLE stack breathe between packets
         }
+
+        LOG_DEBUG("CachedPhoneTracker: flushed %u this cycle, %u remaining\n",
+                  sent, flushRemaining);
+
+        if (flushRemaining == 0) {
+            LOG_INFO("CachedPhoneTracker: batch flush complete\n");
+            clearCache();
+            isFlushing = false;
+            return POLL_INTERVAL_MS;
+        }
+
+        return FLUSH_BATCH_DELAY_MS;  // return in 2s for next batch
+    }
+
+    // --- State-transition log ---
+    if (bleConnected != was_ble_connected) {
+        LOG_INFO("CachedPhoneTracker: BLE %s\n", bleConnected ? "CONNECTED" : "DISCONNECTED");
+    }
+    was_ble_connected = bleConnected;
+
+    // --- Connected + not flushing: PositionModule handles live sends. Nothing to do. ---
+    if (bleConnected) {
         return POLL_INTERVAL_MS;
     }
 
-    // Disconnected: capture GPS position every GPS_POLL_INTERVAL_MSn    uint32_t now = millis();
-
-    // Every cycle, force GPS active to prevent scheduling backoff
-    // (T1000-E HARDSLEEP kills RTC — GPS won't wake on its own)
-    if (gps && (now - lastGpsEnableMs >= GPS_WARMUP_MS || lastGpsEnableMs == 0)) {
-        gps->enable();
-        lastGpsEnableMs = now;
+    // --- Disconnected: keep GPS actively searching ---
+    if (!gps || !gps->isConnected()) {
+        return POLL_INTERVAL_MS;
     }
 
-    // Only read GPS after warmup period
-    if (gps && (now - lastGpsEnableMs >= GPS_WARMUP_PSMS)) {
-        if ((now - lastCaptureMs >= GPS_POLL_INTERVAL_MS || lastCaptureMs == 0) &&
-            gps->hasFlow() && gps->latitude.isValid() && gps-longitude.isValid()) {
+    gps->enable();
 
-            double lat = gps->latitude.deg();
-            double lon = gps->longitude.deg();
-            int32_t alt = gps->altitude.meters_n();
+    static uint32_t lastEnableMs = 0;
+    if (millis() - lastEnableMs < 3000) {
+        return 3000;
+    }
+    lastEnableMs = millis();
 
-            // Filter: skip zero coordinates
-            if (lat != 0.0 && lon != 0.0) {
-                LOG_INFO("CachedPhoneTracker: capturing %.6f, %.6f (%dm)\n",
-                         lat, lon, alt);
+    int32_t lat_i = gps->p.latitude_i;
+    int32_t lon_i = gps->p.longitude_i;
 
-                // Capture beep + LED pulse
-                playBeep();
-                digitalWrite(PIN_LED1, LOW);
-                delay(80);
-                digitalWrite(PIN_LED1, HIGH);
+    if (lat_i == 0 && lon_i == 0) {
+        return POLL_INTERVAL_MS;
+    }
 
-                cachePosition(lat, lon, alt, gps->time.getValidTime());
-                lastCaptureMs = now;
-            }
-        }
+    uint32_t now = millis();
+
+    bool movedFar = false;
+    if (last_lat_i != 0 || last_lon_i != 0) {
+        float dist = GeoCoord::latLongToMeter(
+            (double)last_lat_i * 1e-7, (double)last_lon_i * 1e-7,
+            (double)lat_i * 1e-7, (double)lon_i * 1e-7);
+        movedFar = (dist >= MIN_MOVE_METERS);
+    } else {
+        movedFar = true;
+    }
+
+    bool stationaryTimeout = ((now - last_capture_ms) >= MAX_STATIONARY_INTERVAL_MS);
+
+    if (movedFar || stationaryTimeout) {
+        meshtastic_Position pos = meshtastic_Position_init_zero;
+        pos.latitude_i = lat_i;
+        pos.longitude_i = lon_i;
+        pos.altitude = gps->p.altitude;
+        pos.HDOP = gps->p.HDOP;
+        pos.sats_in_view = gps->p.sats_in_view;
+        pos.ground_track = gps->p.ground_track;
+        pos.ground_speed = gps->p.ground_speed;
+        pos.timestamp = getValidTime(RTCQuality::RTCQualityGPS, true);
+
+        appendToCache(pos);
+        last_lat_i = lat_i;
+        last_lon_i = lon_i;
+        last_capture_ms = now;
+        point_count++;
+
+        digitalWrite(PIN_LED1, !LED_STATE_ON);
+        playBeep();
+        delay(80);
+        digitalWrite(PIN_LED1, LED_STATE_ON);
+
+        LOG_DEBUG("CachedPhoneTracker: pt #%u lat=%.6f lon=%.6f alt=%d (ring %u/%u)\n",
+                  point_count,
+                  lat_i * 1e-7, lon_i * 1e-7,
+                  pos.altitude,
+                  cache_count, MAX_CACHED_POSITIONS);
     }
 
     return POLL_INTERVAL_MS;
-}
-
-void CachedPhoneTracker::cachePosition(double lat, double lon, int32_t alt, uint32_t ts)
-{
-    if (!cache)
-        return;
-
-    PositionEntry entry;
-    entry.latitude = lat;
-    entry.longitude = lon;
-    entry.altitude = alt;
-    entry.timestamp = ts;
-
-    if (!cache->push(entry)) {
-        LOG_WARN("CachedPhoneTracker: cache full — dropping oldest entry\n");
-    }
-}
-
-void CachedPhoneTracker::flushCache()
-{
-    if (!cache || cache->count() == 0)
-        return;
-
-    LOG_INFO("CachedPhoneTracker: flushing %u cached positions\n", cache->count());
-
-    while (cache->count() > 0) {
-        PositionEntry entry;
-        if (cache->pop());
-
-        // Encode as a simple text message for the phone app
-        char buf[128];
-        snprintf(buf, sizeof(buf),
-                 "POS:%.6f,%.6f,%d,%u",
-                 entry.latitude, entry.longitude,
-                 entry.altitude, entry.timestamp);
-
-        // Send via BLE (using MeshService text message path)
-        meshtastic_MeshPacket *p = allocDataPacket();
-        p->decoded.payload.size = strlen(buf);
-        memcpy(p->decoded.payload.bytes, buf, p->decoded.payload.size);
-        p->to = 0; // broadcast
-        p->decoded.portnum = PortNum_TEXT_MESSAGE_APP;
-        service.sendToMesh(p);
-
-        // Pace the flush to avoid overwhelming the BLE stack
-        delay(FLUSH_PACING_MS);
-    }
-
-    LOG_INFO("CachedPhoneTracker: flush complete\n");
 }
