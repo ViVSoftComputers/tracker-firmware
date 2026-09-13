@@ -84,7 +84,7 @@ void CachedPhoneTracker::setup()
 }
 
 // ---------------------------------------------------------------------------
-// isBleConnected - direct nRF52 SoftDevice state, no guessing
+// isBleConnected
 // ---------------------------------------------------------------------------
 bool CachedPhoneTracker::isBleConnected()
 {
@@ -92,18 +92,17 @@ bool CachedPhoneTracker::isBleConnected()
 }
 
 // ---------------------------------------------------------------------------
-// runOnce - GPS capture when disconnected, batch flush on reconnect
+// runOnce
 // ---------------------------------------------------------------------------
 int32_t CachedPhoneTracker::runOnce()
 {
-    // --- Tracker mode OFF: do nothing, let Meshtastic operate normally ---
     if (!trackerModeActive) {
         return POLL_INTERVAL_MS;
     }
 
     bool bleConnected = isBleConnected();
 
-    // --- BLE reconnected -> start batch flush (streamed over multiple poll cycles) ---
+    // BLE reconnected: start batch flush
     if (bleConnected && !was_ble_connected && cache_count > 0 && !isFlushing) {
         LOG_INFO("CachedPhoneTracker: BLE reconnected, starting batch flush of %u positions\n", cache_count);
         isFlushing = true;
@@ -111,9 +110,7 @@ int32_t CachedPhoneTracker::runOnce()
         flushRemaining = cache_count;
     }
 
-    // --- Streaming batch flush: send FLUSH_BATCH_SIZE per poll cycle ---
-    // MAX_RX_TOPHONE is only 16 on nRF52 - we send 8 at a time with a 2s gap
-    // so the phone app has time to drain its BLE receive queue.
+    // Streaming batch flush: 8 per cycle, 2s gap between batches
     if (isFlushing) {
         uint16_t sent = 0;
         while (flushRemaining > 0 && sent < FLUSH_BATCH_SIZE) {
@@ -140,8 +137,8 @@ int32_t CachedPhoneTracker::runOnce()
             p->priority = meshtastic_MeshPacket_Priority_BACKGROUND;
             p->which_payload_variant = meshtastic_MeshPacket_decoded_tag;
 
-            pb_ostream_t stream = pb_ostream_from_buffer(p->decoded.payload.butes,
-                                                          sizeof(p->decoded.payload.butes));
+            pb_ostream_t stream = pb_ostream_from_buffer(p->decoded.payload.bytes,
+                                                          sizeof(p->decoded.payload.bytes));
             if (!pb_encode(&stream, meshtastic_Position_fields, &pos)) {
                 LOG_WARN("CachedPhoneTracker: pb encode fail during flush\n");
                 packetPool.release(p);
@@ -159,7 +156,7 @@ int32_t CachedPhoneTracker::runOnce()
             flushIdx = (flushIdx + 1) % MAX_CACHED_POSITIONS;
             flushRemaining--;
 
-            delay(150);  // let BLE stack breathe between packets
+            delay(150);
         }
 
         LOG_DEBUG("CachedPhoneTracker: flushed %u this cycle, %u remaining\n",
@@ -172,21 +169,18 @@ int32_t CachedPhoneTracker::runOnce()
             return POLL_INTERVAL_MS;
         }
 
-        return FLUSH_BATCH_DELAY_MS;  // return in 2s for next batch
+        return FLUSH_BATCH_DELAY_MS;
     }
 
-    // --- State-transition log ---
     if (bleConnected != was_ble_connected) {
         LOG_INFO("CachedPhoneTracker: BLE %s\n", bleConnected ? "CONNECTED" : "DISCONNECTED");
     }
     was_ble_connected = bleConnected;
 
-    // --- Connected + not flushing: PositionModule handles live sends. Nothing to do. ---
     if (bleConnected) {
         return POLL_INTERVAL_MS;
     }
 
-    // --- Disconnected: keep GPS actively searching ---
     if (!gps || !gps->isConnected()) {
         return POLL_INTERVAL_MS;
     }
