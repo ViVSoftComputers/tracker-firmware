@@ -118,9 +118,6 @@ int32_t CachedPhoneTracker::runOnce()
     }
 
     // --- Single-packet flush tick ---
-    // sendToPhone() silently drops POSITION_APP when toPhoneQueue is full (only
-    // TEXT/RANGE_TEST/ROUTING displace old entries). We send 1 packet per 200ms
-    // (5/sec) — BLE drains at 10-15/sec, so the 16-slot queue never fills.
     if (isFlushing && flushRemaining > 0 && bleConnected) {
         meshtastic_Position pos = meshtastic_Position_init_zero;
         uint32_t timestamp = 0;
@@ -158,7 +155,7 @@ int32_t CachedPhoneTracker::runOnce()
             return POLL_INTERVAL_MS;
         }
 
-        return FLUSH_TICK_MS;  // fire again in 200ms for next packet
+        return FLUSH_TICK_MS;
     }
 
     // --- State-transition log ---
@@ -167,36 +164,24 @@ int32_t CachedPhoneTracker::runOnce()
     }
     was_ble_connected = bleConnected;
 
-    // --- Connected + not flushing: PositionModule handles live sends. Nothing to do. ---
+    // --- Connected + not flushing: PositionModule handles live sends. ---
     if (bleConnected) {
         return POLL_INTERVAL_MS;
     }
 
     // --- Disconnected: keep GPS actively searching ---
-    // GPS thread's scheduling backoff (consecutiveFailures) can park
-    // the GPS in GPS_HARDSLEEP for minutes after a single failed fix.
-    // On T1000-E, HARDSLEEP cuts RTC power so the chip wake timer
-    // dies — only our poll can revive it. Call enable() every cycle
-    // to reset scheduling, clear failures, and force GPS_ACTIVE.
     if (!gps || !gps->isConnected()) {
         return POLL_INTERVAL_MS;
     }
 
-    gps->enable(); // unconditional: reset scheduling, force GPS_ACTIVE
+    gps->enable();
 
-    // Give GPS a few seconds to stream NMEA and acquire a fix.
-    // We re-enter every poll and re-enable, so stale scheduling
-    // (consecutiveFailures → position_broadcast_secs backoff)
-    // cannot park us in HARDSLEEP for minutes.
     static uint32_t lastEnableMs = 0;
     if (millis() - lastEnableMs < 3000) {
         return 3000;
     }
     lastEnableMs = millis();
 
-    // NOTE: Don't gate on hasLock() — on weak GPS (T1000-E tiny antenna),
-    // the lock flag flickers between fix cycles but gps->p still holds
-    // valid coords from the last successful fix.
     int32_t lat_i = gps->p.latitude_i;
     int32_t lon_i = gps->p.longitude_i;
 
@@ -206,7 +191,6 @@ int32_t CachedPhoneTracker::runOnce()
 
     uint32_t now = millis();
 
-    // Movement / timeout filter
     bool movedFar = false;
     if (last_lat_i != 0 || last_lon_i != 0) {
         float dist = GeoCoord::latLongToMeter(
@@ -236,7 +220,6 @@ int32_t CachedPhoneTracker::runOnce()
         last_capture_ms = now;
         point_count++;
 
-        // --- Feedback: LED pulse-off + beep on capture ---
         digitalWrite(PIN_LED1, !LED_STATE_ON);
         playBeep();
         delay(80);
@@ -257,7 +240,6 @@ int32_t CachedPhoneTracker::runOnce()
 // ---------------------------------------------------------------------------
 void CachedPhoneTracker::appendToCache(const meshtastic_Position &pos)
 {
-    // 1. Encode position → protobuf
     uint8_t pb_buf[meshtastic_Position_size] = {0};
     pb_ostream_t stream = pb_ostream_from_buffer(pb_buf, sizeof(pb_buf));
     if (!pb_encode(&stream, meshtastic_Position_fields, &pos)) {
@@ -266,7 +248,6 @@ void CachedPhoneTracker::appendToCache(const meshtastic_Position &pos)
     }
     uint16_t pb_len = stream.bytes_written;
 
-    // 2. Pre-allocate ring file on first write
     if (!FSCom.exists(CACHE_PATH)) {
         File f = FSCom.open(CACHE_PATH, FILE_O_WRITE);
         if (f) {
@@ -283,7 +264,6 @@ void CachedPhoneTracker::appendToCache(const meshtastic_Position &pos)
         return;
     }
 
-    // 3. Write at ring head
     uint32_t offset = cache_head * (ENTRY_HEADER_SIZE + meshtastic_Position_size + 2);
     f.seek(offset);
 
@@ -299,19 +279,16 @@ void CachedPhoneTracker::appendToCache(const meshtastic_Position &pos)
     header[7] = 0;
     f.write(header, ENTRY_HEADER_SIZE);
 
-    // 4. Protobuf payload + zero-pad to fixed slot width
     f.write(pb_buf, pb_len);
     uint16_t padding = meshtastic_Position_size - pb_len;
     for (uint16_t i = 0; i < padding; i++) {
         f.write((uint8_t)0);
     }
 
-    // 5. CRC16 placeholder
     uint8_t crc[2] = {0, 0};
     f.write(crc, 2);
     f.close();
 
-    // 6. Advance ring
     if (cache_count < MAX_CACHED_POSITIONS) {
         cache_count++;
     }
@@ -400,12 +377,7 @@ void CachedPhoneTracker::saveCacheIndex()
 // ---------------------------------------------------------------------------
 ProcessMessage CachedPhoneTracker::handleReceived(const meshtastic_MeshPacket &mp)
 {
-    // Only text messages
     if (mp.decoded.portnum != meshtastic_PortNum_TEXT_MESSAGE_APP)
-        return ProcessMessage::CONTINUE;
-
-    // Only when phone is connected (command came over BLE, not mesh)
-    if (!isBleConnected())
         return ProcessMessage::CONTINUE;
 
     const char *payload = (const char *)mp.decoded.payload.bytes;
@@ -420,34 +392,22 @@ ProcessMessage CachedPhoneTracker::handleReceived(const meshtastic_MeshPacket &m
 }
 
 // ---------------------------------------------------------------------------
-// sendCacheViaText — respond with cache contents via TEXT_MESSAGE_APP
+// sendCacheViaText — respond via sendToMesh(RX_SRC_LOCAL) for serial visibility
 // ---------------------------------------------------------------------------
 void CachedPhoneTracker::sendCacheViaText()
 {
-    if (!isBleConnected())
-        return;
-
-    char buf[128];
-
-    snprintf(buf, sizeof(buf), "CACHE: %u positions (head=%u tail=%u)",
-             cache_count, cache_head, cache_tail);
-
-    meshtastic_MeshPacket *p = packetPool.allocZeroed();
-    if (p) {
+    if (cache_count == 0) {
+        meshtastic_MeshPacket *p = packetPool.allocZeroed();
         p->to = nodeDB->getNodeNum();
+        p->hop_limit = 0;
         p->from = nodeDB->getNodeNum();
-        p->decoded.portnum = meshtastic_PortNum_TEXT_MESSAGE_APP;
-        p->decoded.want_response = false;
-        p->priority = meshtastic_MeshPacket_Priority_BACKGROUND;
-        p->which_payload_variant = meshtastic_MeshPacket_decoded_tag;
-        memcpy(p->decoded.payload.bytes, buf, strlen(buf));
-        p->decoded.payload.size = strlen(buf);
-        service->sendToPhone(p);
+        p->decoded.payload.size = snprintf((char *)p->decoded.payload.bytes,
+            sizeof(p->decoded.payload.bytes), "CACHE EMPTY");
+        service->sendToMesh(p, RX_SRC_LOCAL, false);
+        return;
     }
 
-    if (cache_count == 0)
-        return;
-
+    char buf[128];
     uint16_t idx = cache_tail;
     for (uint16_t i = 0; i < cache_count; i++) {
         meshtastic_Position pos = meshtastic_Position_init_zero;
@@ -463,23 +423,15 @@ void CachedPhoneTracker::sendCacheViaText()
             snprintf(buf, sizeof(buf), "[%u/%u] CORRUPT", i + 1, cache_count);
         }
 
-        p = packetPool.allocZeroed();
-        if (p) {
-            p->to = nodeDB->getNodeNum();
-            p->from = nodeDB->getNodeNum();
-            p->decoded.portnum = meshtastic_PortNum_TEXT_MESSAGE_APP;
-            p->decoded.want_response = false;
-            p->priority = meshtastic_MeshPacket_Priority_BACKGROUND;
-            p->which_payload_variant = meshtastic_MeshPacket_decoded_tag;
-            memcpy(p->decoded.payload.bytes, buf, strlen(buf));
-            p->decoded.payload.size = strlen(buf);
-            service->sendToPhone(p);
-        }
-
-        idx = (idx + 1) % MAX_CACHED_POSITIONS;
+        meshtastic_MeshPacket *p = packetPool.allocZeroed();
+        p->to = nodeDB->getNodeNum();
+        p->hop_limit = 0;
+        p->from = nodeDB->getNodeNum();
+        p->decoded.payload.size = snprintf((char *)p->decoded.payload.bytes,
+            sizeof(p->decoded.payload.bytes), "%s", buf);
+        service->sendToMesh(p, RX_SRC_LOCAL, false);
     }
 }
-
 
 // ---------------------------------------------------------------------------
 // loadCacheIndex
