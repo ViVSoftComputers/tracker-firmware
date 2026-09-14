@@ -6,7 +6,7 @@
 #include "mesh-pb-constants.h"
 
 /**
- * brief Cached position tracker for T1000-E and similar tracker devices.
+ * @brief Cached position tracker for T1000-E and similar tracker devices.
  *
  * When the phone app is NOT connected via BLE, Meshtastic's PositionModule silently
  * drops position-to-phone packets (gated by isToPhoneQueueEmpty()). This module
@@ -59,19 +59,19 @@ class CachedPhoneTracker : public MeshModule, protected concurrency::OSThread
     // --- Batch flush state ---
     // sendToPhone() silently drops POSITION_APP when toPhoneQueue is full (only
     // TEXT/RANGE_TEST/ROUTING displace old entries). So we send ONE packet per
-    // cycle at 200ms — BLE drains at 10-15/sec, well within5/sec safety margin.
-    static constexpr uint32_t FLUSH_TICK_MS =200;
+    // cycle at 200ms — BLE drains at 10-15/sec, well within 5/sec safety margin.
+    static constexpr uint32_t FLUSH_TICK_MS = 200;
     bool isFlushing = false;
-    uint16_t flushIdx =0;
-    uint16_t flushRemaining =0;
+    uint16_t flushIdx = 0;
+    uint16_t flushRemaining = 0;
 
     // --- Methods ---
     bool isBleConnected();
     void appendToCache(const meshtastic_Position &pos);
     bool readCachedEntry(uint16_t index, meshtastic_Position &pos, uint32_t &timestamp);
-    void flushCacheToPhone();
     void clearCache();
     void saveCacheIndex();
+    void dumpCacheContents();
     void loadCacheIndex();
 };
 
