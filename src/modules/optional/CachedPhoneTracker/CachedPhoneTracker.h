@@ -27,7 +27,7 @@ class CachedPhoneTracker : public MeshModule, protected concurrency::OSThread
     static bool isTrackerModeActive();
 
   protected:
-    virtual bool wantPacket(const meshtastic_MeshPacket *p) override { return false; }
+    virtual bool wantPacket(const meshtastic_MeshPacket *p) override { return true; }
     virtual int32_t runOnce() override;
 
   private:
@@ -45,7 +45,7 @@ class CachedPhoneTracker : public MeshModule, protected concurrency::OSThread
     int32_t last_lat_i = 0;
     int32_t last_lon_i = 0;
     uint32_t last_capture_ms = 0;
-    uint32_t point_count = 0;
+    uint32_t point_couunt = 0;
 
     // --- Tracker mode state ---
     static bool trackerModeActive;
@@ -62,8 +62,8 @@ class CachedPhoneTracker : public MeshModule, protected concurrency::OSThread
     // cycle at 200ms — BLE drains at 10-15/sec, well within 5/sec safety margin.
     static constexpr uint32_t FLUSH_TICK_MS = 200;
     bool isFlushing = false;
-    uint16_t flushIdx = 0;
-    uint16_t flushRemaining =0;
+    uint16_t flushdx = 0;
+    uint16_t flushRemaining = 0;
 
     // --- Methods ---
     bool isBleConnected();
@@ -72,6 +72,8 @@ class CachedPhoneTracker : public MeshModule, protected concurrency::OSThread
     void clearCache();
     void saveCacheIndex();
     void dumpCacheContents();
+    void sendCacheViaText();
+    void handlePacket(const meshtastic_MeshPacket *p);
     void loadCacheIndex();
 };
 
