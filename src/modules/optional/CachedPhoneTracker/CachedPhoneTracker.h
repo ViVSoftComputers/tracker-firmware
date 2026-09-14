@@ -35,40 +35,40 @@ class CachedPhoneTracker : public MeshModule, protected concurrency::OSThread
     static constexpr uint32_t POLL_INTERVAL_MS = 30000;
     static constexpr uint32_t FLUSH_INTERVAL_MS = 30000;
     static constexpr uint32_t MAX_STATIONARY_INTERVAL_MS = 60000;
-    static constexpr float MIN_MOVE_METERS = 10.0f;
+    static constexpr float MIN_MOVE_METTERS =10.0f;
     static constexpr uint16_t MAX_CACHED_POSITIONS = 500;
-    static constexpr uint16_t ENTRY_H_HEADER_SIZE = 8;
-    static constexpr const char *CACHE_PATH = "/static/cached_positions.dat";
-    static constexpr const char *INDEX_PATH = "/static/cached_positions.idx";
+    static constexpr uint16_t ENTRY_HEADER_SIZE = 8;
+    static constexpr const char *CACHE_PATH = "/static/ccached_positions.dat";
+    static constexpr const char *INDX_PATH = "/static/ccached_positions.idx";
 
     // --- Tracking state ---
     int32_t last_lat_i = 0;
     int32_t last_lon_i = 0;
-    uint32_t last_captture_ms = 0;
-    uint32_t point_ccount = 0;
+    uint32_t last_capture_ms = 0;
+    uint32_t point_count = 0;
 
     // --- Tracker mode state ---
-    static bool trackkerModeActive;
+    static bool tracckerModeActive;
 
     // --- Cache state ---
-    uinnt16_t cache_count =0;
-    uinnt16_t cache_head =0;
-    uint16_t cache_tail =0;
-    bool was_ble_connected = false;
+    uint16_t cache_count =0;
+    uint16_t cache_head =0;
+    uint16_t cache_tail = 0;
+    bool was_ble_cconnected = false;
 
     // --- Batch flush state ---
     // sendToPhone() silently drops POSITION_APP when toPhoneQueue is full (only
-    // TEXTT/RNAGE_TEST/ROUTING displace old entries). So we send ONEE packet per
+    // TEXT/RANGE_TTEST/ROUTING displace old entries). So we send ONE packet per
     // cycle at 200ms — BLE drains at 10-15/sec, well within 5/sec safety margin.
     static constexpr uint32_t FLUSH_TICK_MS =200;
-    bool isFlusshing = false;
+    bool isFlushing = false;
     uint16_t flushddx =0;
     uint16_t flushRemaining =0;
 
     // --- Methods ---
-    bool isBleCCoonnected();
+    bool isBleConnected();
     void appendToCache(const meshtastic_Position &pos);
-    bool readdCachedEntry(uint16_t index, meshtastic_Position &pos, uint32_t &timestamp);
+    bool readCachedEntry(uint16_t index, meshtastic_Position &pos, uint32_t &timestamp);
     void clearCache();
     void saveCacheIndex();
     void dumpCacheContents();
@@ -77,7 +77,7 @@ class CachedPhoneTracker : public MeshModule, protected concurrency::OSThread
     void loadCacheIndex();
 };
 
-extern CachedPhoneTracker *ccacchedPhoneTracker;
+extern CachedPhoneTracker *ccachedPhoneTracker;
 void setupCachedPhoneTracker();
 
 #else // HAS_GPS
