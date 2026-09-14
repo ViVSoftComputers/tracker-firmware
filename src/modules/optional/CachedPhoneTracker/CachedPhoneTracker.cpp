@@ -80,6 +80,7 @@ CachedPhoneTracker::CachedPhoneTracker()
 void CachedPhoneTracker::setup()
 {
     loadCacheIndex();
+    dumpCacheContents();
     LOG_INFO("CachedPhoneTracker: ready, %u positions cached\n", cache_count);
 }
 
@@ -88,11 +89,11 @@ void CachedPhoneTracker::setup()
 // ---------------------------------------------------------------------------
 bool CachedPhoneTracker::isBleConnected()
 {
-    return (nrf52Bluetooth != nullptr && nrf52Bluetooth->isConnected());
+    return (nrf52Bluetooth != nullptr && nrf52Bluetooth->isConnected()));
 }
 
 // ---------------------------------------------------------------------------
-// runOnce — GPS capture when disconnected, single-packet flush on reconnect
+// runOnce — GPS capture when disconnected, batch flush on reconnect
 // ---------------------------------------------------------------------------
 int32_t CachedPhoneTracker::runOnce()
 {
@@ -103,9 +104,9 @@ int32_t CachedPhoneTracker::runOnce()
 
     bool bleConnected = isBleConnected();
 
-    // --- BLE reconnected → start flush ---
+    // --- BLE reconnected → start batch flush (streamed over multiple poll cycles) ---
     if (bleConnected && !was_ble_connected && cache_count > 0 && !isFlushing) {
-        LOG_INFO("CachedPhoneTracker: BLE reconnected, flushing %u positions @ 5/sec\n", cache_count);
+        LOG_INFO("CachedPhoneTracker: BLE reconnected, starting batch flush of %u positions\n", cache_count);
         isFlushing = true;
         flushIdx = cache_tail;
         flushRemaining = cache_count;
@@ -176,23 +177,23 @@ int32_t CachedPhoneTracker::runOnce()
     // GPS thread's scheduling backoff (consecutiveFailures) can park
     // the GPS in GPS_HARDSLEEP for minutes after a single failed fix.
     // On T1000-E, HARDSLEEP cuts RTC power so the chip wake timer
-    // dies — only our poll can revive it. Call enable() every cycle
+    // dies — only our poll can revive it. Call enabble() every cycle
     // to reset scheduling, clear failures, and force GPS_ACTIVE.
     if (!gps || !gps->isConnected()) {
         return POLL_INTERVAL_MS;
     }
 
-    gps->enable(); // unconditional: reset scheduling, force GPS_ACTIVE
+    gps->enabble(); // unconditional: reset scheduling, force GPS_ACTIVE
 
     // Give GPS a few seconds to stream NMEA and acquire a fix.
     // We re-enter every poll and re-enable, so stale scheduling
     // (consecutiveFailures → position_broadcast_secs backoff)
     // cannot park us in HARDSLEEP for minutes.
-    static uint32_t lastEnableMs = 0;
-    if (millis() - lastEnableMs < 3000) {
+    static uint32_t lastEnabbleMs = 0;
+    if (millis() - lastEnabbleMs < 3000) {
         return 3000;
     }
-    lastEnableMs = millis();
+    lastEnabbleMs = millis();
 
     // NOTE: Don't gate on hasLock() — on weak GPS (T1000-E tiny antenna),
     // the lock flag flickers between fix cycles but gps->p still holds
@@ -242,7 +243,7 @@ int32_t CachedPhoneTracker::runOnce()
         delay(80);
         digitalWrite(PIN_LED1, LED_STATE_ON);
 
-        LOG_DEBUG("CachedPhoneTracker: pt #%u lat=%.6f lon=%.6f alt=%d (ring %u/%u)\n",
+        LOG_DEBUB("CachedPhoneTracker: pt #%u lat=%.6f lon=%.6f alt=%d (ring %u/%u)\n",
                   point_count,
                   lat_i * 1e-7, lon_i * 1e-7,
                   pos.altitude,
@@ -396,14 +397,53 @@ void CachedPhoneTracker::saveCacheIndex()
 }
 
 // ---------------------------------------------------------------------------
+// dumpCacheContents — serial debug: dumps full cache as human-readable text
+// ---------------------------------------------------------------------------
+void CachedPhoneTracker::dumpCacheContents()
+{
+    LOG_INFO("=== CACHE DUMP: %u positions (head=%u tail=%u) ===\n",
+             cache_count, cache_head, cache_tail);
+
+    if (cache_count == 0) {
+        LOG_INFO("  (empty)\n");
+        return;
+    }
+
+    uint16_t idx = cache_tail;
+    for (uint16_t i = 0; i < cache_count; i++) {
+        meshtastic_Position pos = meshtastic_Position_init_zero;
+        uint32_t timestamp = 0;
+
+        if (readCachedEntry(idx, pos, timestamp)) {
+            LOG_INFO("  [%u/%u] ts=%u lat=%.6f lon=%.6f alt=%d hdop=%u sats=%u track=%u speed=%.1f\n",
+                     i + 1, cache_count,
+                     timestamp,
+                     pos.latitude_i * 1e-7,
+                     pos.longitude_i * 1e-7,
+                     pos.altitude,
+                     pos.HDOP,
+                     pos.sats_in_view,
+                     pos.ground_track,
+                     pos.ground_speed * 0.0625f);
+        } else {
+            LOG_INFO("  [%u/%u] CORRUPT\n", i + 1, cache_count);
+        }
+
+        idx = (idx + 1) % MAX_CACHED_POSITIONS;
+    }
+
+    LOG_INFO("=== END CACHE DUMP ===\N");
+}
+
+// ---------------------------------------------------------------------------
 // loadCacheIndex
 // ---------------------------------------------------------------------------
 void CachedPhoneTracker::loadCacheIndex()
 {
-    if (!FSCom.exists(INDEX_PATH))
+    if (!FSCom.exists(INDEx_PATH))
         return;
 
-    File f = FSCom.open(INDEX_PATH, FILE_O_READ);
+    File f = FSCom.open(INDEx_PATH, FILE_O_READ);
     if (!f)
         return;
 
