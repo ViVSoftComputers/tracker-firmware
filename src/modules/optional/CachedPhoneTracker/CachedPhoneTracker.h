@@ -63,7 +63,7 @@ class CachedPhoneTracker : public MeshModule, protected concurrency::OSThread
     static constexpr uint32_t FLUSH_TICK_MS = 200;
     bool isFlushing = false;
     uint16_t flushIdx = 0;
-    uint16_t flushRemaining = 0;
+    uint16_t flushRemaining =0;
 
     // --- Methods ---
     bool isBleConnected();
