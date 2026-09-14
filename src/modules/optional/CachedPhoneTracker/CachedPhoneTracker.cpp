@@ -89,7 +89,7 @@ void CachedPhoneTracker::setup()
 // ---------------------------------------------------------------------------
 bool CachedPhoneTracker::isBleConnected()
 {
-    return (nrf52Bluetooth != nullptr && nrf52Bluetooth->isConnected()));
+    return (nrf52Bluetooth != nullptr && nrf52Bluetooth->isConnected());
 }
 
 // ---------------------------------------------------------------------------
@@ -177,23 +177,23 @@ int32_t CachedPhoneTracker::runOnce()
     // GPS thread's scheduling backoff (consecutiveFailures) can park
     // the GPS in GPS_HARDSLEEP for minutes after a single failed fix.
     // On T1000-E, HARDSLEEP cuts RTC power so the chip wake timer
-    // dies — only our poll can revive it. Call enabble() every cycle
+    // dies — only our poll can revive it. Call enable() every cycle
     // to reset scheduling, clear failures, and force GPS_ACTIVE.
     if (!gps || !gps->isConnected()) {
         return POLL_INTERVAL_MS;
     }
 
-    gps->enabble(); // unconditional: reset scheduling, force GPS_ACTIVE
+    gps->enable(); // unconditional: reset scheduling, force GPS_ACTIVE
 
     // Give GPS a few seconds to stream NMEA and acquire a fix.
     // We re-enter every poll and re-enable, so stale scheduling
     // (consecutiveFailures → position_broadcast_secs backoff)
     // cannot park us in HARDSLEEP for minutes.
-    static uint32_t lastEnabbleMs = 0;
-    if (millis() - lastEnabbleMs < 3000) {
+    static uint32_t lastEnableMs = 0;
+    if (millis() - lastEnableMs < 3000) {
         return 3000;
     }
-    lastEnabbleMs = millis();
+    lastEnableMs = millis();
 
     // NOTE: Don't gate on hasLock() — on weak GPS (T1000-E tiny antenna),
     // the lock flag flickers between fix cycles but gps->p still holds
@@ -243,7 +243,7 @@ int32_t CachedPhoneTracker::runOnce()
         delay(80);
         digitalWrite(PIN_LED1, LED_STATE_ON);
 
-        LOG_DEBUB("CachedPhoneTracker: pt #%u lat=%.6f lon=%.6f alt=%d (ring %u/%u)\n",
+        LOG_DEBUG("CachedPhoneTracker: pt #%u lat=%.6f lon=%.6f alt=%d (ring %u/%u)\n",
                   point_count,
                   lat_i * 1e-7, lon_i * 1e-7,
                   pos.altitude,
@@ -432,7 +432,7 @@ void CachedPhoneTracker::dumpCacheContents()
         idx = (idx + 1) % MAX_CACHED_POSITIONS;
     }
 
-    LOG_INFO("=== END CACHE DUMP ===\N");
+    LOG_INFO("=== END CACHE DUMP ===\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -440,10 +440,10 @@ void CachedPhoneTracker::dumpCacheContents()
 // ---------------------------------------------------------------------------
 void CachedPhoneTracker::loadCacheIndex()
 {
-    if (!FSCom.exists(INDEx_PATH))
+    if (!FSCom.exists(INDEX_PATH))
         return;
 
-    File f = FSCom.open(INDEx_PATH, FILE_O_READ);
+    File f = FSCom.open(INDEX_PATH, FILE_O_READ);
     if (!f)
         return;
 
