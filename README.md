@@ -2,6 +2,16 @@
 
 Custom Meshtastic firmware for Seeed Card Tracker T1000-E (nRF52840 + GNSS + Semtech LoRa) providing offline GPS track caching, gesture toggle, and dual-mode sync (Meshtastic App Position Log sync + USB/Serial GPX export).
 
+ðŸ“– **Read the full write-up & deep-dive guide:** [Building an Offline GPS Data Logger for Meshtastic (Seeed Card Tracker T1000-E)](https://hub.lorameshdevices.com/blog/building-an-offline-gps-data-logger-for-meshtastic-seeed-card-tracker-t1000-e)
+
+---
+
+> [!WARNING]
+> ### âš ï¸ Important: Back Up Your Existing Firmware First
+> Before flashing custom firmware or any new UF2 onto your Seeed T1000-E, **always back up your current device configuration and existing firmware/flash**. 
+> - Export your node configuration and keys using the Meshtastic mobile app or the Meshtastic CLI (`meshtastic --export-config > my_config.yaml`).
+> - Keep a copy of your factory/stock T1000-E UF2 binary handy so you can restore your device at any time if needed.
+
 ---
 
 ## Button Gestures (T1000-E)
@@ -94,45 +104,6 @@ The compiled UF2 binary is located at:
 
 ### Flashing via UF2 Bootloader
 
-1. Connect the Seeed T1000-E via USB.
-2. Put the device into bootloader mode (mounts as removable drive `D:` or `NRF52BOOT`).
-3. Copy `firmware-tracker-t1000e.uf2` to the drive.
-4. The device automatically flashes and reboots into normal operating mode.
-
----
-
-## Python Tool Usage (`tracker_tool.py`)
-
-Run commands directly from Windows terminal:
-
-```bash
-# Check status
-python tracker_tool.py status --port COM3
-
-# Trigger phone app sync
-python tracker_tool.py sync --port COM3
-
-# Dump track and export GPX
-python tracker_tool.py dump --port COM3 -o tracklog.gpx
-
-# Clear cache after backup
-python tracker_tool.py clear --port COM3
-```
-
----
-
-## Repository Structure
-
-```
-src/modules/optional/
-  CachedPhoneTracker/
-    CachedPhoneTracker.h      # Module interface & ring-buffer definitions
-    CachedPhoneTracker.cpp    # GPS logging, BLE sync, & serial CLI handler
-meshtastic-tracker-hook.patch # Upstream integration patch
-tracker_tool.py               # Serial CLI management and GPX exporter tool
-tracker.bat                   # Convenient Windows batch wrapper
-```
-
-## License
-
-This project is built on Meshtastic firmware and inherits its GPL v3 licensing. See upstream [LICENSE](https://github.com/meshtastic/firmware/blob/master/LICENSE) for details.
+1. Double-click the reset button or touch COM port at 1200 baud to enter bootloader mode (mounts as removable drive `D:` or `NRF52BOOT`).
+2. Copy `firmware-tracker-t1000e.uf2` to the drive.
+3. The device automatically flashes and reboots into normal operating mode.
