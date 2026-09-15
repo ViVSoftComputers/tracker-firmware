@@ -2,12 +2,12 @@
 
 Custom Meshtastic firmware for Seeed Card Tracker T1000-E (nRF52840 + GNSS + Semtech LoRa) providing offline GPS track caching, gesture toggle, and dual-mode sync (Meshtastic App Position Log sync + USB/Serial GPX export).
 
-ðŸ“– **Read the full write-up & deep-dive guide:** [Building an Offline GPS Data Logger for Meshtastic (Seeed Card Tracker T1000-E)](https://hub.lorameshdevices.com/blog/building-an-offline-gps-data-logger-for-meshtastic-seeed-card-tracker-t1000-e)
+📖 **Read the full write-up & deep-dive guide:** [Building an Offline GPS Data Logger for Meshtastic (Seeed Card Tracker T1000-E)](https://hub.lorameshdevices.com/blog/building-an-offline-gps-data-logger-for-meshtastic-seeed-card-tracker-t1000-e)
 
 ---
 
 > [!WARNING]
-> ### âš ï¸ Important: Back Up Your Existing Firmware First
+> ### ⚠️ Important: Back Up Your Existing Firmware First
 > Before flashing custom firmware or any new UF2 onto your Seeed T1000-E, **always back up your current device configuration and existing firmware/flash**. 
 > - Export your node configuration and keys using the Meshtastic mobile app or the Meshtastic CLI (`meshtastic --export-config > my_config.yaml`).
 > - Keep a copy of your factory/stock T1000-E UF2 binary handy so you can restore your device at any time if needed.
