@@ -12,6 +12,10 @@ Custom Meshtastic firmware for Seeed Card Tracker T1000-E (nRF52840 + GNSS + Sem
 > - Export your node configuration and keys using the Meshtastic mobile app or the Meshtastic CLI (`meshtastic --export-config > my_config.yaml`).
 > - Keep a copy of your factory/stock T1000-E UF2 binary handy so you can restore your device at any time if needed.
 
+> [!NOTE]
+> **Channel Configuration Recommendation**  
+> Since this firmware uses messaging, it is best to make your default channel a private channel and move your LongFast (or public channel) to slot 1 or higher.
+
 ---
 
 ## Button Gestures (T1000-E)
