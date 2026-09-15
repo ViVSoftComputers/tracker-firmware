@@ -4,15 +4,26 @@ Custom Meshtastic firmware for Seeed Card Tracker T1000-E (nRF52840 + GNSS + Sem
 
 ---
 
+## Button Gestures (T1000-E)
+
+| Gesture | Action | Notes |
+|---|---|---|
+| **2 Clicks** (Double-press) | **Tracker Mode Toggle (ON / OFF)** | Turns tracking ON (solid green LED, ascending chime) or OFF (LED off, descending chime). Trackpoints in flash are preserved. |
+| **3 Clicks** (Triple-press) | **Position Broadcast / GPS Toggle** | Meshtastic default triple-press behavior. |
+| **4 Clicks** (Quad-press) | **Node Info / Position Ping** | Original 2-click ping moved here to keep quick 2-click gesture dedicated to tracker logging. |
+| **Long Press (Hold)** | **Power / Shutdown** | Meshtastic default long-press power management. |
+
+---
+
 ## Key Features & How It Works
 
 ### 1. 100% Stock Meshtastic Operation When OFF
 - The tracker module boots **OFF** by default (`trackerModeActive = false`, LED is OFF).
 - When OFF, it does not force GPS awake or interfere with standard Meshtastic device roles, smart broadcast intervals, sleep cycles, or LoRa mesh communications.
 
-### 2. 4-Click Hardware Activation & Deactivation
-- **Turn ON (4 Clicks):** Plays ascending 4-click tone (`play4ClickUp()`), turns LED solid ON, keeps GPS enabled, and begins logging.
-- **Turn OFF (4 Clicks):** Plays descending 4-click tone (`play4ClickDown()`), turns LED OFF, returns GPS to Meshtastic power management.
+### 2. 2-Click Hardware Activation & Deactivation
+- **Turn ON (2 Clicks):** Plays ascending tone (`play4ClickUp()`), turns LED solid ON, keeps GPS enabled, and begins logging 1 fix every 60 seconds.
+- **Turn OFF (2 Clicks):** Plays descending tone (`play4ClickDown()`), turns LED OFF, returns GPS to Meshtastic power management.
 - **Track Preserved:** Toggling OFF **never erases** the recorded track. All points remain safely stored in flash memory until explicitly cleared.
 
 ### 3. Balanced Logging Cadence (1 Fix / Minute)
@@ -38,8 +49,8 @@ Available via Meshtastic app text message (local node) or USB Serial CLI:
 | Command | Action |
 |---|---|
 | `tracker:status` | Returns mode (`ON`/`OFF`), GPS lock, satellite count, coordinates, and cache count (e.g. `cache=371/500`) |
-| `tracker:on` | Activates tracker mode (same as 4 clicks up) |
-| `tracker:off` | Deactivates tracker mode (same as 4 clicks down; preserves cache) |
+| `tracker:on` | Activates tracker mode (same as 2 clicks up) |
+| `tracker:off` | Deactivates tracker mode (same as 2 clicks down; preserves cache) |
 | `tracker:sync` | Streams cached points to the connected Meshtastic phone app as native `POSITION_APP` packets |
 | `tracker:dump` | Streams points in `$TRK` format for PC tool export |
 | `tracker:clear` | Resets the ring buffer and wipes cached trackpoints |
@@ -56,13 +67,13 @@ To apply this module to any clean or future upstream Meshtastic firmware release
    cp -r src/modules/optional/CachedPhoneTracker/ <new-firmware-root>/src/modules/optional/
    ```
 
-2. Apply the minimal 40-line hook patch:
+2. Apply the minimal hook patch:
    ```bash
    git apply meshtastic-tracker-hook.patch
    ```
 
 The patch touches only two locations in upstream code:
-- `src/input/ButtonThread.cpp`: Hooks `case 4` to toggle tracker mode.
+- `src/input/ButtonThread.cpp`: Hooks `BUTTON_EVENT_DOUBLE_PRESSED` to toggle tracker mode, and redirects 4-click to the ping event.
 - `src/modules/Modules.cpp`: Instantiates `cachedPhoneTracker = new CachedPhoneTracker();`.
 
 ---
@@ -78,14 +89,15 @@ cd ~/src/firmware
 ~/.local/bin/pio run -e tracker-t1000-e
 ```
 
-**Artifact:** `.pio/build/tracker-t1000-e/firmware.uf2`
+The compiled UF2 binary is located at:
+`.pio/build/tracker-t1000-e/firmware-tracker-t1000-e-2.8.1.471c07d.uf2`
 
-### Flashing (UF2 Bootloader)
+### Flashing via UF2 Bootloader
 
 1. Connect the Seeed T1000-E via USB.
-2. **Double-click the button** — the device mounts as a removable USB drive (e.g. `D:\`).
-3. Drag and drop `firmware-tracker-t1000e.uf2` onto the drive.
-4. The drive automatically unmounts and reboots into the updated firmware on `COM3`.
+2. Put the device into bootloader mode (mounts as removable drive `D:` or `NRF52BOOT`).
+3. Copy `firmware-tracker-t1000e.uf2` to the drive.
+4. The device automatically flashes and reboots into normal operating mode.
 
 ---
 
