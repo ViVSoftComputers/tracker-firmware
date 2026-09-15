@@ -107,3 +107,9 @@ The compiled UF2 binary is located at:
 1. Double-click the reset button or touch COM port at 1200 baud to enter bootloader mode (mounts as removable drive `D:` or `NRF52BOOT`).
 2. Copy `firmware-tracker-t1000e.uf2` to the drive.
 3. The device automatically flashes and reboots into normal operating mode.
+
+---
+
+## Hardware
+
+- [Buy your own T1000-E](https://amzn.to/4hwW079)
