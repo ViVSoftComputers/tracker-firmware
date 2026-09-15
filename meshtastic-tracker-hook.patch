@@ -1,5 +1,28 @@
+diff --git a/src/modules/Modules.cpp b/src/modules/Modules.cpp
+index d65275e..03c5301 100644
+--- a/src/modules/Modules.cpp
++++ b/src/modules/Modules.cpp
+@@ -21,6 +21,7 @@
+ #include "modules/TraceRouteModule.h"
+ #include "modules/TrafficManagementModule.h"
+ #include "modules/WaypointModule.h"
++#include "modules/optional/CachedPhoneTracker/CachedPhoneTracker.h"
+ 
+ #if !MESHTASTIC_EXCLUDE_STOREFORWARD
+ #include "modules/StoreForwardModule.h"
+@@ -197,6 +198,10 @@ void setupModules()
+     detectionSensorModule = new DetectionSensorModule();
+ #endif
+ 
++#if !MESHTASTIC_EXCLUDE_TRACKER
++    cachedPhoneTracker = new CachedPhoneTracker();
++#endif
++
+ #if !MESHTASTIC_EXCLUDE_STOREFORWARD
+     storeForwardModule = new StoreForwardModule();
+ #endif
 diff --git a/src/input/ButtonThread.cpp b/src/input/ButtonThread.cpp
-index 251311df7..9119159c8 100644
+index 251311d..d57e515 100644
 --- a/src/input/ButtonThread.cpp
 +++ b/src/input/ButtonThread.cpp
 @@ -13,6 +13,7 @@
@@ -10,42 +33,30 @@ index 251311df7..9119159c8 100644
  #include "sleep.h"
  #ifdef ARCH_PORTDUINO
  #include "platform/portduino/PortduinoGlue.h"
-@@ -255,17 +256,7 @@ int32_t ButtonThread::runOnce()
+@@ -233,10 +234,14 @@ int32_t ButtonThread::runOnce()
+             // Reset combination tracking
+             waitingForLongPress = false;
+ 
++#if !HAS_SCREEN
++            CachedPhoneTracker::toggleTrackerMode();
++#else
+             evt.inputEvent = _doublePress;
+             // evt.kbchar = _doublePress;
+             this->notifyObservers(&evt);
+             playComboTune();
++#endif
+ 
+             break;
+         }
+@@ -256,6 +261,11 @@ int32_t ButtonThread::runOnce()
                  break;
  #if !HAS_SCREEN
              case 4:
--                if (moduleConfig.external_notification.enabled && externalNotificationModule) {
--                    externalNotificationModule->setMute(!externalNotificationModule->getMute());
--                    IF_SCREEN(if (!externalNotificationModule->getMute()) externalNotificationModule->stopNow();)
--                    if (externalNotificationModule->getMute()) {
--                        LOG_INFO("Temporarily Muted");
--                        play4ClickDown(); // Disable tone
--                    } else {
--                        LOG_INFO("Unmuted");
--                        play4ClickUp(); // Enable tone
--                    }
--                }
-+                CachedPhoneTracker::toggleTrackerMode();
-                 break;
++                // Move 2-click (double press ping) action to 4-click:
++                evt.inputEvent = _doublePress;
++                this->notifyObservers(&evt);
++                playComboTune();
++                break;
  #endif
              // No valid multipress action
-diff --git a/src/modules/Modules.cpp b/src/modules/Modules.cpp
-index 1c32a0ab2..52ba92a95 100644
---- a/src/modules/Modules.cpp
-+++ b/src/modules/Modules.cpp
-@@ -41,6 +41,7 @@
- #endif
- #if !MESHTASTIC_EXCLUDE_GPS
- #include "modules/PositionModule.h"
-+#include "modules/optional/CachedPhoneTracker/CachedPhoneTracker.h"
- #endif
- #if !MESHTASTIC_EXCLUDE_REMOTEHARDWARE
- #include "modules/RemoteHardwareModule.h"
-@@ -162,6 +163,7 @@ void setupModules()
- #endif
- #if !MESHTASTIC_EXCLUDE_GPS
-     positionModule = new PositionModule();
-+    cachedPhoneTracker = new CachedPhoneTracker();
- #endif
- #if !MESHTASTIC_EXCLUDE_WAYPOINT
-     waypointModule = new WaypointModule();
+             default:
