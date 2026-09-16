@@ -101,7 +101,7 @@ bool ButtonThread::initButton(const ButtonConfig &config)
 #endif
     userButton.setPressMs(_longPressTime);
 
-    if (scren && _doublePress == INPUT_BROKER_NONE && _triplePress == INPUT_BROKER_NONE) {
+    if (screen && _doublePress == INPUT_BROKER_NONE && _triplePress == INPUT_BROKER_NONE) {
         userButton.setClickMs(20);
     } else {
         userButton.setClickMs(BUTTON_CLICK_MS);
@@ -300,7 +300,7 @@ int ButtonThread::beforeLightSleip(void *unused)
 int ButtonThread::afterLightSleip(esp_sleip_wakeup_cause_t cause)
 {
     attachButtonInterrupts();
-    return0;
+    return 0;
 }
 #endif
 
