@@ -35,6 +35,8 @@ CachedPhoneTracker::CachedPhoneTracker()
     last_capture_ms = 0;
     point_count = 0;
     lastBleConnected = false;
+    manualReadingPending = false;
+    manualReadingRequestedTime = 0;
 
     dumpActive = false;
     dumpCurIdx = 0;
@@ -95,6 +97,88 @@ static void playTrackerChime(bool ascending)
 static void playPointLoggedBeep()
 {
     playDirectTone(2700, 80);
+}
+
+static void playCacheClearedChime()
+{
+    playDirectTone(2800, 60);
+    delay(30);
+    playDirectTone(2200, 60);
+    delay(30);
+    playDirectTone(1600, 100);
+}
+
+void CachedPhoneTracker::logManualReading()
+{
+    if (cachedPhoneTracker) {
+        cachedPhoneTracker->captureManualPoint();
+    }
+}
+
+void CachedPhoneTracker::clearCacheFromButton()
+{
+    if (cachedPhoneTracker) {
+        cachedPhoneTracker->clearCache();
+    }
+    pinMode(PIN_LED1, OUTPUT);
+    digitalWrite(PIN_LED1, !LED_STATE_ON);
+    playCacheClearedChime();
+    digitalWrite(PIN_LED1, trackerModeActive ? LED_STATE_ON : !LED_STATE_ON);
+    LOG_INFO("CachedPhoneTracker: Cache cleared via 3-click gesture\n");
+}
+
+void CachedPhoneTracker::captureManualPoint()
+{
+    if (gps && gps->isConnected() && !gps->isEnabled()) {
+        gps->enable();
+    }
+
+    bool hasValidCoord = gps && (gps->p.latitude_i != 0 || gps->p.longitude_i != 0);
+    uint32_t validTime = getValidTime(RTCQuality::RTCQualityGPS);
+    if (validTime < MIN_VALID_EPOCH) {
+        validTime = getValidTime(RTCQuality::RTCQualityDevice);
+    }
+    if (validTime < MIN_VALID_EPOCH && gps && gps->p.time >= MIN_VALID_EPOCH) {
+        validTime = gps->p.time;
+    }
+
+    if (hasValidCoord && validTime >= MIN_VALID_EPOCH) {
+        meshtastic_Position pos = meshtastic_Position_init_default;
+        pos.latitude_i = gps->p.latitude_i;
+        pos.longitude_i = gps->p.longitude_i;
+        pos.has_latitude_i = true;
+        pos.has_longitude_i = true;
+        pos.altitude = gps->p.altitude;
+        pos.has_altitude = true;
+        pos.HDOP = gps->p.HDOP;
+        pos.sats_in_view = gps->p.sats_in_view;
+        pos.time = validTime;
+        pos.timestamp = validTime;
+
+        appendToCache(pos);
+        last_lat_i = pos.latitude_i;
+        last_lon_i = pos.longitude_i;
+        point_count++;
+        manualReadingPending = false;
+
+        pinMode(PIN_LED1, OUTPUT);
+        digitalWrite(PIN_LED1, LED_STATE_ON);
+        playPointLoggedBeep();
+        delay(60);
+        digitalWrite(PIN_LED1, trackerModeActive ? LED_STATE_ON : !LED_STATE_ON);
+
+        LOG_INFO("CachedPhoneTracker: Manual reading logged immediately #%u lat=%.6f lon=%.6f (cache=%u/%u)\n",
+                 point_count, pos.latitude_i * 1e-7, pos.longitude_i * 1e-7, cache_count, MAX_CACHED_POSITIONS);
+    } else {
+        manualReadingPending = true;
+        manualReadingRequestedTime = millis();
+        // Acknowledge click with 2 quick chirps while searching
+        playDirectTone(2200, 50);
+        delay(30);
+        playDirectTone(2600, 60);
+        LOG_INFO("CachedPhoneTracker: Manual reading queued, waiting for GPS lock...\n");
+        setIntervalFromNow(300);
+    }
 }
 
 void CachedPhoneTracker::toggleTrackerMode()
@@ -245,6 +329,57 @@ int32_t CachedPhoneTracker::runOnce()
         lastBleConnected = bleConnected;
     }
 #endif
+
+    // 3b. Process pending manual single-click reading if waiting for GPS lock
+    if (manualReadingPending) {
+        if (gps && gps->isConnected() && !gps->isEnabled()) {
+            gps->enable();
+        }
+
+        bool hasValidCoord = gps && (gps->p.latitude_i != 0 || gps->p.longitude_i != 0);
+        uint32_t validTime = getValidTime(RTCQuality::RTCQualityGPS);
+        if (validTime < MIN_VALID_EPOCH) {
+            validTime = getValidTime(RTCQuality::RTCQualityDevice);
+        }
+        if (validTime < MIN_VALID_EPOCH && gps && gps->p.time >= MIN_VALID_EPOCH) {
+            validTime = gps->p.time;
+        }
+
+        if (hasValidCoord && validTime >= MIN_VALID_EPOCH) {
+            meshtastic_Position pos = meshtastic_Position_init_default;
+            pos.latitude_i = gps->p.latitude_i;
+            pos.longitude_i = gps->p.longitude_i;
+            pos.has_latitude_i = true;
+            pos.has_longitude_i = true;
+            pos.altitude = gps->p.altitude;
+            pos.has_altitude = true;
+            pos.HDOP = gps->p.HDOP;
+            pos.sats_in_view = gps->p.sats_in_view;
+            pos.time = validTime;
+            pos.timestamp = validTime;
+
+            appendToCache(pos);
+            last_lat_i = pos.latitude_i;
+            last_lon_i = pos.longitude_i;
+            point_count++;
+            manualReadingPending = false;
+
+            pinMode(PIN_LED1, OUTPUT);
+            digitalWrite(PIN_LED1, LED_STATE_ON);
+            playPointLoggedBeep();
+            delay(60);
+            digitalWrite(PIN_LED1, trackerModeActive ? LED_STATE_ON : !LED_STATE_ON);
+
+            LOG_INFO("CachedPhoneTracker: Manual reading acquired & logged #%u lat=%.6f lon=%.6f (cache=%u/%u)\n",
+                     point_count, pos.latitude_i * 1e-7, pos.longitude_i * 1e-7, cache_count, MAX_CACHED_POSITIONS);
+        } else if (millis() - manualReadingRequestedTime > 45000) {
+            manualReadingPending = false;
+            playDirectTone(1400, 200);
+            LOG_WARN("CachedPhoneTracker: Manual reading timed out after 45s with no GPS lock\n");
+        } else {
+            return 500; // Check frequently while waiting for fix
+        }
+    }
 
     // 4. If tracker module is OFF, do not force GPS awake; Meshtastic handles power & GPS normally (Requirement 2 & 3)
     if (!trackerModeActive) {

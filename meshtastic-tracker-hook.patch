@@ -22,6 +22,48 @@ index 63f4e9b13..fb37f6ea0 100644
      }
  }
  
+diff --git a/src/input/ButtonThread.cpp b/src/input/ButtonThread.cpp
+index d57e5152d..bdfdd18dd 100644
+--- a/src/input/ButtonThread.cpp
++++ b/src/input/ButtonThread.cpp
+@@ -189,10 +189,14 @@ int32_t ButtonThread::runOnce()
+         evt.touchY = 0;
+         switch (btnEvent) {
+         case BUTTON_EVENT_PRESSED: {
++#if !HAS_SCREEN
++            CachedPhoneTracker::logManualReading();
++#else
+             // Forward single press to InputBroker (but NOT as DOWN/SELECT, just forward a "button press" event)
+             evt.inputEvent = _singlePress;
+             // evt.kbchar = _singlePress; // todo: fix this. Some events are kb characters rather than event types
+             this->notifyObservers(&evt);
++#endif
+ 
+             // Start tracking for potential combination
+             waitingForLongPress = true;
+@@ -253,13 +257,22 @@ int32_t ButtonThread::runOnce()
+ 
+             switch (multipressClickCount) {
+             case 3:
++#if !HAS_SCREEN
++                CachedPhoneTracker::clearCacheFromButton();
++#else
+                 evt.inputEvent = _triplePress;
+                 // evt.kbchar = _triplePress;
+                 this->notifyObservers(&evt);
+                 playComboTune();
++#endif
+                 break;
+ #if !HAS_SCREEN
+             case 4:
++                evt.inputEvent = _triplePress;
++                this->notifyObservers(&evt);
++                playComboTune();
++                break;
++            case 5:
+                 evt.inputEvent = _doublePress;
+                 this->notifyObservers(&evt);
+                 playComboTune();
 diff --git a/src/mesh/MeshService.cpp b/src/mesh/MeshService.cpp
 index 707d292a9..c96dad44b 100644
 --- a/src/mesh/MeshService.cpp
@@ -41,7 +83,7 @@ index 707d292a9..c96dad44b 100644
      DEBUG_HEAP_BEFORE;
      auto a = packetPool.allocCopy(p);
 diff --git a/src/modules/optional/CachedPhoneTracker/CachedPhoneTracker.cpp b/src/modules/optional/CachedPhoneTracker/CachedPhoneTracker.cpp
-index 9586ee3a9..717d94334 100644
+index 9586ee3a9..3a8909ffe 100644
 --- a/src/modules/optional/CachedPhoneTracker/CachedPhoneTracker.cpp
 +++ b/src/modules/optional/CachedPhoneTracker/CachedPhoneTracker.cpp
 @@ -8,6 +8,7 @@
@@ -52,7 +94,16 @@ index 9586ee3a9..717d94334 100644
  
  // Default tracker mode to OFF on boot (Requirement 3)
  bool CachedPhoneTracker::trackerModeActive = false;
-@@ -57,20 +58,59 @@ bool CachedPhoneTracker::wantPacket(const meshtastic_MeshPacket *p)
+@@ -34,6 +35,8 @@ CachedPhoneTracker::CachedPhoneTracker()
+     last_capture_ms = 0;
+     point_count = 0;
+     lastBleConnected = false;
++    manualReadingPending = false;
++    manualReadingRequestedTime = 0;
+ 
+     dumpActive = false;
+     dumpCurIdx = 0;
+@@ -57,20 +60,141 @@ bool CachedPhoneTracker::wantPacket(const meshtastic_MeshPacket *p)
      return (p->decoded.portnum == meshtastic_PortNum_TEXT_MESSAGE_APP);
  }
  
@@ -95,6 +146,88 @@ index 9586ee3a9..717d94334 100644
 +    playDirectTone(2700, 80);
 +}
 +
++static void playCacheClearedChime()
++{
++    playDirectTone(2800, 60);
++    delay(30);
++    playDirectTone(2200, 60);
++    delay(30);
++    playDirectTone(1600, 100);
++}
++
++void CachedPhoneTracker::logManualReading()
++{
++    if (cachedPhoneTracker) {
++        cachedPhoneTracker->captureManualPoint();
++    }
++}
++
++void CachedPhoneTracker::clearCacheFromButton()
++{
++    if (cachedPhoneTracker) {
++        cachedPhoneTracker->clearCache();
++    }
++    pinMode(PIN_LED1, OUTPUT);
++    digitalWrite(PIN_LED1, !LED_STATE_ON);
++    playCacheClearedChime();
++    digitalWrite(PIN_LED1, trackerModeActive ? LED_STATE_ON : !LED_STATE_ON);
++    LOG_INFO("CachedPhoneTracker: Cache cleared via 3-click gesture\n");
++}
++
++void CachedPhoneTracker::captureManualPoint()
++{
++    if (gps && gps->isConnected() && !gps->isEnabled()) {
++        gps->enable();
++    }
++
++    bool hasValidCoord = gps && (gps->p.latitude_i != 0 || gps->p.longitude_i != 0);
++    uint32_t validTime = getValidTime(RTCQuality::RTCQualityGPS);
++    if (validTime < MIN_VALID_EPOCH) {
++        validTime = getValidTime(RTCQuality::RTCQualityDevice);
++    }
++    if (validTime < MIN_VALID_EPOCH && gps && gps->p.time >= MIN_VALID_EPOCH) {
++        validTime = gps->p.time;
++    }
++
++    if (hasValidCoord && validTime >= MIN_VALID_EPOCH) {
++        meshtastic_Position pos = meshtastic_Position_init_default;
++        pos.latitude_i = gps->p.latitude_i;
++        pos.longitude_i = gps->p.longitude_i;
++        pos.has_latitude_i = true;
++        pos.has_longitude_i = true;
++        pos.altitude = gps->p.altitude;
++        pos.has_altitude = true;
++        pos.HDOP = gps->p.HDOP;
++        pos.sats_in_view = gps->p.sats_in_view;
++        pos.time = validTime;
++        pos.timestamp = validTime;
++
++        appendToCache(pos);
++        last_lat_i = pos.latitude_i;
++        last_lon_i = pos.longitude_i;
++        point_count++;
++        manualReadingPending = false;
++
++        pinMode(PIN_LED1, OUTPUT);
++        digitalWrite(PIN_LED1, LED_STATE_ON);
++        playPointLoggedBeep();
++        delay(60);
++        digitalWrite(PIN_LED1, trackerModeActive ? LED_STATE_ON : !LED_STATE_ON);
++
++        LOG_INFO("CachedPhoneTracker: Manual reading logged immediately #%u lat=%.6f lon=%.6f (cache=%u/%u)\n",
++                 point_count, pos.latitude_i * 1e-7, pos.longitude_i * 1e-7, cache_count, MAX_CACHED_POSITIONS);
++    } else {
++        manualReadingPending = true;
++        manualReadingRequestedTime = millis();
++        // Acknowledge click with 2 quick chirps while searching
++        playDirectTone(2200, 50);
++        delay(30);
++        playDirectTone(2600, 60);
++        LOG_INFO("CachedPhoneTracker: Manual reading queued, waiting for GPS lock...\n");
++        setIntervalFromNow(300);
++    }
++}
++
  void CachedPhoneTracker::toggleTrackerMode()
  {
      trackerModeActive = !trackerModeActive;
@@ -114,7 +247,7 @@ index 9586ee3a9..717d94334 100644
          LOG_INFO("CachedPhoneTracker: Tracker Mode OFF (cache preserved)\n");
      }
  }
-@@ -92,6 +132,10 @@ void CachedPhoneTracker::replyText(const char *msg)
+@@ -92,6 +216,10 @@ void CachedPhoneTracker::replyText(const char *msg)
  
  bool CachedPhoneTracker::sendPositionToPhone(const TrackPoint &pt)
  {
@@ -125,7 +258,7 @@ index 9586ee3a9..717d94334 100644
      meshtastic_MeshPacket *p = packetPool.allocZeroed();
      if (!p)
          return false;
-@@ -110,6 +154,7 @@ bool CachedPhoneTracker::sendPositionToPhone(const TrackPoint &pt)
+@@ -110,6 +238,7 @@ bool CachedPhoneTracker::sendPositionToPhone(const TrackPoint &pt)
  
      p->to = NODENUM_BROADCAST;
      p->from = nodeDB->getNodeNum();
@@ -133,7 +266,65 @@ index 9586ee3a9..717d94334 100644
      p->decoded.portnum = meshtastic_PortNum_POSITION_APP;
      p->decoded.want_response = false;
      p->priority = meshtastic_MeshPacket_Priority_BACKGROUND;
-@@ -211,17 +256,32 @@ int32_t CachedPhoneTracker::runOnce()
+@@ -201,6 +330,57 @@ int32_t CachedPhoneTracker::runOnce()
+     }
+ #endif
+ 
++    // 3b. Process pending manual single-click reading if waiting for GPS lock
++    if (manualReadingPending) {
++        if (gps && gps->isConnected() && !gps->isEnabled()) {
++            gps->enable();
++        }
++
++        bool hasValidCoord = gps && (gps->p.latitude_i != 0 || gps->p.longitude_i != 0);
++        uint32_t validTime = getValidTime(RTCQuality::RTCQualityGPS);
++        if (validTime < MIN_VALID_EPOCH) {
++            validTime = getValidTime(RTCQuality::RTCQualityDevice);
++        }
++        if (validTime < MIN_VALID_EPOCH && gps && gps->p.time >= MIN_VALID_EPOCH) {
++            validTime = gps->p.time;
++        }
++
++        if (hasValidCoord && validTime >= MIN_VALID_EPOCH) {
++            meshtastic_Position pos = meshtastic_Position_init_default;
++            pos.latitude_i = gps->p.latitude_i;
++            pos.longitude_i = gps->p.longitude_i;
++            pos.has_latitude_i = true;
++            pos.has_longitude_i = true;
++            pos.altitude = gps->p.altitude;
++            pos.has_altitude = true;
++            pos.HDOP = gps->p.HDOP;
++            pos.sats_in_view = gps->p.sats_in_view;
++            pos.time = validTime;
++            pos.timestamp = validTime;
++
++            appendToCache(pos);
++            last_lat_i = pos.latitude_i;
++            last_lon_i = pos.longitude_i;
++            point_count++;
++            manualReadingPending = false;
++
++            pinMode(PIN_LED1, OUTPUT);
++            digitalWrite(PIN_LED1, LED_STATE_ON);
++            playPointLoggedBeep();
++            delay(60);
++            digitalWrite(PIN_LED1, trackerModeActive ? LED_STATE_ON : !LED_STATE_ON);
++
++            LOG_INFO("CachedPhoneTracker: Manual reading acquired & logged #%u lat=%.6f lon=%.6f (cache=%u/%u)\n",
++                     point_count, pos.latitude_i * 1e-7, pos.longitude_i * 1e-7, cache_count, MAX_CACHED_POSITIONS);
++        } else if (millis() - manualReadingRequestedTime > 45000) {
++            manualReadingPending = false;
++            playDirectTone(1400, 200);
++            LOG_WARN("CachedPhoneTracker: Manual reading timed out after 45s with no GPS lock\n");
++        } else {
++            return 500; // Check frequently while waiting for fix
++        }
++    }
++
+     // 4. If tracker module is OFF, do not force GPS awake; Meshtastic handles power & GPS normally (Requirement 2 & 3)
+     if (!trackerModeActive) {
+         return TRACKER_POLL_INTERVAL_MS;
+@@ -211,17 +391,32 @@ int32_t CachedPhoneTracker::runOnce()
          gps->enable();
      }
  
@@ -171,7 +362,7 @@ index 9586ee3a9..717d94334 100644
      uint32_t now = millis();
      // Check if 1 minute (60 seconds) has elapsed since last capture
      if (last_capture_ms != 0 && (now - last_capture_ms < TRACKER_LOG_INTERVAL_MS)) {
-@@ -237,10 +297,8 @@ int32_t CachedPhoneTracker::runOnce()
+@@ -237,10 +432,8 @@ int32_t CachedPhoneTracker::runOnce()
      pos.has_altitude = true;
      pos.HDOP = gps->p.HDOP;
      pos.sats_in_view = gps->p.sats_in_view;
@@ -184,7 +375,7 @@ index 9586ee3a9..717d94334 100644
  
      appendToCache(pos);
      last_lat_i = lat_i;
-@@ -252,15 +310,20 @@ int32_t CachedPhoneTracker::runOnce()
+@@ -252,15 +445,20 @@ int32_t CachedPhoneTracker::runOnce()
      digitalWrite(PIN_LED1, !LED_STATE_ON);
      delay(50);
      digitalWrite(PIN_LED1, LED_STATE_ON);
@@ -207,7 +398,7 @@ index 9586ee3a9..717d94334 100644
      TrackPoint pt;
      pt.timestamp = pos.timestamp;
      pt.lat_i = pos.latitude_i;
-@@ -292,6 +355,7 @@ void CachedPhoneTracker::appendToCache(const meshtastic_Position &pos)
+@@ -292,6 +490,7 @@ void CachedPhoneTracker::appendToCache(const meshtastic_Position &pos)
  
  bool CachedPhoneTracker::readCachedEntry(uint16_t index, TrackPoint &pt)
  {
@@ -215,7 +406,7 @@ index 9586ee3a9..717d94334 100644
      if (index >= MAX_CACHED_POSITIONS || !FSCom.exists(CACHE_PATH))
          return false;
  
-@@ -300,14 +364,30 @@ bool CachedPhoneTracker::readCachedEntry(uint16_t index, TrackPoint &pt)
+@@ -300,14 +499,30 @@ bool CachedPhoneTracker::readCachedEntry(uint16_t index, TrackPoint &pt)
          return false;
  
      uint32_t readPos = (uint32_t)index * sizeof(TrackPoint);
@@ -246,7 +437,7 @@ index 9586ee3a9..717d94334 100644
      File f = FSCom.open(INDEX_PATH, FILE_O_WRITE);
      if (!f)
          return;
-@@ -336,6 +416,7 @@ void CachedPhoneTracker::loadCacheIndex()
+@@ -336,6 +551,7 @@ void CachedPhoneTracker::loadCacheIndex()
          cache_count = data[0];
          cache_head = data[1];
          cache_tail = data[2];
@@ -254,7 +445,7 @@ index 9586ee3a9..717d94334 100644
          if (cache_count > MAX_CACHED_POSITIONS)
              cache_count = 0;
          if (cache_head >= MAX_CACHED_POSITIONS)
-@@ -344,6 +425,22 @@ void CachedPhoneTracker::loadCacheIndex()
+@@ -344,6 +560,22 @@ void CachedPhoneTracker::loadCacheIndex()
              cache_tail = 0;
      }
      f.close();
@@ -277,7 +468,7 @@ index 9586ee3a9..717d94334 100644
  }
  
  void CachedPhoneTracker::clearCache()
-@@ -356,6 +453,9 @@ void CachedPhoneTracker::clearCache()
+@@ -356,6 +588,9 @@ void CachedPhoneTracker::clearCache()
      if (FSCom.exists(CACHE_PATH)) {
          FSCom.remove(CACHE_PATH);
      }
@@ -287,7 +478,7 @@ index 9586ee3a9..717d94334 100644
      saveCacheIndex();
      LOG_INFO("CachedPhoneTracker: Cache cleared\n");
  }
-@@ -386,6 +486,9 @@ void CachedPhoneTracker::startSync()
+@@ -386,6 +621,9 @@ void CachedPhoneTracker::startSync()
      syncTotalToSend = cache_count;
      syncSentCount = 0;
      setIntervalFromNow(10);
@@ -297,7 +488,7 @@ index 9586ee3a9..717d94334 100644
      LOG_INFO("CachedPhoneTracker: Starting sync of %u points to phone app\n", syncTotalToSend);
  }
  
-@@ -393,6 +496,8 @@ ProcessMessage CachedPhoneTracker::handleReceived(const meshtastic_MeshPacket &m
+@@ -393,6 +631,8 @@ ProcessMessage CachedPhoneTracker::handleReceived(const meshtastic_MeshPacket &m
  {
      if (mp.decoded.portnum != meshtastic_PortNum_TEXT_MESSAGE_APP)
          return ProcessMessage::CONTINUE;
@@ -306,7 +497,7 @@ index 9586ee3a9..717d94334 100644
  
      const char *payload = (const char *)mp.decoded.payload.bytes;
      size_t plen = mp.decoded.payload.size;
-@@ -473,10 +578,13 @@ ProcessMessage CachedPhoneTracker::handleReceived(const meshtastic_MeshPacket &m
+@@ -473,10 +713,13 @@ ProcessMessage CachedPhoneTracker::handleReceived(const meshtastic_MeshPacket &m
          pos.has_latitude_i = true;
          pos.has_longitude_i = true;
          pos.has_altitude = true;
@@ -324,3 +515,37 @@ index 9586ee3a9..717d94334 100644
  
          appendToCache(pos);
          point_count++;
+diff --git a/src/modules/optional/CachedPhoneTracker/CachedPhoneTracker.h b/src/modules/optional/CachedPhoneTracker/CachedPhoneTracker.h
+index 278293c80..408ae2e84 100644
+--- a/src/modules/optional/CachedPhoneTracker/CachedPhoneTracker.h
++++ b/src/modules/optional/CachedPhoneTracker/CachedPhoneTracker.h
+@@ -35,6 +35,10 @@ public:
+     virtual ProcessMessage handleReceived(const meshtastic_MeshPacket &mp) override;
+     static void toggleTrackerMode();
+     static bool isTrackerModeActive() { return trackerModeActive; }
++    static void logManualReading();
++    static void clearCacheFromButton();
++    void captureManualPoint();
++    void clearCache();
+ 
+ protected:
+     virtual int32_t runOnce() override;
+@@ -50,6 +54,10 @@ private:
+     uint32_t point_count;
+     bool lastBleConnected;
+ 
++    // Manual single-click reading state
++    bool manualReadingPending;
++    uint32_t manualReadingRequestedTime;
++
+     // Asynchronous non-blocking text dump state ($TRK lines for GPX / tracker_tool.py)
+     bool dumpActive;
+     uint16_t dumpCurIdx;
+@@ -66,7 +74,6 @@ private:
+     bool readCachedEntry(uint16_t index, TrackPoint &pt);
+     void saveCacheIndex();
+     void loadCacheIndex();
+-    void clearCache();
+     void startDump();
+     void startSync();
+     bool sendPositionToPhone(const TrackPoint &pt);

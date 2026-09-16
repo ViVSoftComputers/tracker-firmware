@@ -35,6 +35,10 @@ public:
     virtual ProcessMessage handleReceived(const meshtastic_MeshPacket &mp) override;
     static void toggleTrackerMode();
     static bool isTrackerModeActive() { return trackerModeActive; }
+    static void logManualReading();
+    static void clearCacheFromButton();
+    void captureManualPoint();
+    void clearCache();
 
 protected:
     virtual int32_t runOnce() override;
@@ -49,6 +53,10 @@ private:
     uint32_t last_capture_ms;
     uint32_t point_count;
     bool lastBleConnected;
+
+    // Manual single-click reading state
+    bool manualReadingPending;
+    uint32_t manualReadingRequestedTime;
 
     // Asynchronous non-blocking text dump state ($TRK lines for GPX / tracker_tool.py)
     bool dumpActive;
@@ -66,7 +74,6 @@ private:
     bool readCachedEntry(uint16_t index, TrackPoint &pt);
     void saveCacheIndex();
     void loadCacheIndex();
-    void clearCache();
     void startDump();
     void startSync();
     bool sendPositionToPhone(const TrackPoint &pt);

@@ -22,9 +22,11 @@ Custom Meshtastic firmware for Seeed Card Tracker T1000-E (nRF52840 + GNSS + Sem
 
 | Gesture | Action | Notes |
 |---|---|---|
+| **1 Click** (Single-press) | **Manual Waypoint Reading** | Takes a reading and adds it to flash cache even if Tracker Mode is OFF. Flashes LED and beeps 2700Hz on success. (If GPS is searching, chirps and logs as soon as lock is acquired). |
 | **2 Clicks** (Double-press) | **Tracker Mode Toggle (ON / OFF)** | Turns tracking ON (solid green LED, ascending chime) or OFF (LED off, descending chime). Trackpoints in flash are preserved. |
-| **3 Clicks** (Triple-press) | **Position Broadcast / GPS Toggle** | Meshtastic default triple-press behavior. |
-| **4 Clicks** (Quad-press) | **Node Info / Position Ping** | Original 2-click ping moved here to keep quick 2-click gesture dedicated to tracker logging. |
+| **3 Clicks** (Triple-press) | **Clear Flash Cache** | Wipes all cached trackpoints from flash and resets buffer to 0/500 (descending triple chime). |
+| **4 Clicks** (Quad-press) | **Position Broadcast / GPS Toggle** | Meshtastic default position broadcast / GPS toggle (moved from 3 clicks). |
+| **5 Clicks** (5x Multi-press) | **Node Info / Position Ping** | Original 2-click ping moved here to keep quick clicks dedicated to tracker controls. |
 | **Long Press (Hold)** | **Power / Shutdown** | Meshtastic default long-press power management. |
 
 ---
