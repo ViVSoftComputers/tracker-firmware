@@ -1,3 +1,10 @@
 .vexp/
 __pycache__/
 *.pyc
+.friday/
+.dummy/
+.pio/
+.vscode/
+file-attachments/
+%SystemDrive%/
+%SystemDrive%*

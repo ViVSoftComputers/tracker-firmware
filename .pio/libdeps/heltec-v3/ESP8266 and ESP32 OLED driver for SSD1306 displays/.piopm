@@ -1,1 +1,0 @@
-{"type": "library", "name": "ESP8266 and ESP32 OLED driver for SSD1306 displays", "version": "4.4.1", "spec": {"owner": null, "id": null, "name": "esp8266-oled-ssd1306", "requirements": null, "uri": "https://github.com/meshtastic/esp8266-oled-ssd1306/archive/bb93fd40685f22e850330ea162f1dd154a4e0685.zip"}}

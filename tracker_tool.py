@@ -1,143 +1,64 @@
-import sys
-import time
 import argparse
-from datetime import datetime, timezone
+import time
 import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 
 try:
     import meshtastic
     import meshtastic.serial_interface
     from pubsub import pub
 except ImportError:
-    print('Error: meshtastic python library not installed.')
-    print('Install it with: pip install meshtastic')
-    sys.exit(1)
+    raise SystemExit("Install dependencies with: pip install meshtastic")
+
 
 def export_to_gpx(points, filename="tracklog.gpx"):
-    if not points:
-        return
-    gpx = ET.Element("gpx", {
-        "version": "1.1",
-        "creator": "T1000-E Cached Phone Tracker",
-        "xmlns": "http://www.topografix.com/GPX/1/1",
-        "xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance",
-        "xsi:schemaLocation": "http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd"
-    })
-
-    metadata = ET.SubElement(gpx, "metadata")
-    name_el = ET.SubElement(metadata, "name")
-    name_el.text = "T1000-E Track Log"
-    time_el = ET.SubElement(metadata, "time")
-    time_el.text = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
+    gpx = ET.Element("gpx", {"version": "1.1", "creator": "T1000-E Cached Tracker", "xmlns": "http://www.topografix.com/GPX/1/1"})
     trk = ET.SubElement(gpx, "trk")
-    trk_name = ET.SubElement(trk, "name")
-    trk_name.text = f"T1000-E Track {datetime.now().strftime('%Y-%m-%d %H:%M')}"
-    trkseg = ET.SubElement(trk, "trkseg")
-
+    ET.SubElement(trk, "name").text = "T1000-E Track"
+    seg = ET.SubElement(trk, "trkseg")
     for pt in points:
-        trkpt = ET.SubElement(trkseg, "trkpt", {"lat": str(pt["lat"]), "lon": str(pt["lon"])})
+        p = ET.SubElement(seg, "trkpt", lat=str(pt["lat"]), lon=str(pt["lon"]))
         if pt.get("alt") is not None:
-            ele = ET.SubElement(trkpt, "ele")
-            ele.text = str(pt["alt"])
+            ET.SubElement(p, "ele").text = str(pt["alt"])
         if pt.get("time"):
-            time_pt = ET.SubElement(trkpt, "time")
-            try:
-                dt = datetime.fromtimestamp(pt["time"], tz=timezone.utc)
-                time_pt.text = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
-            except Exception:
-                pass
-        if pt.get("hdop") is not None:
-            hdop_el = ET.SubElement(trkpt, "hdop")
-            hdop_el.text = f"{pt['hdop'] / 100.0:.2f}"
-
-    xml_str = ET.tostring(gpx, encoding="utf-8", xml_declaration=True).decode("utf-8")
+            ET.SubElement(p, "time").text = datetime.fromtimestamp(pt["time"], timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     with open(filename, "w", encoding="utf-8") as f:
-        f.write(xml_str)
-    print(f"\n[GPX] Saved {len(points)} trackpoint(s) to '{filename}'")
+        f.write(ET.tostring(gpx, encoding="unicode", xml_declaration=True))
+
 
 def main():
-    parser = argparse.ArgumentParser(description='T1000-E Cached Tracker CLI')
-    parser.add_argument('command', choices=['status', 'on', 'off', 'sync', 'dump', 'clear', 'test'], help='Tracker command')
-    parser.add_argument('--port', default=None, help='Serial COM port (e.g. COM3)')
-    parser.add_argument('-o', '--output', default='tracklog.gpx', help='GPX output file for dump')
+    parser = argparse.ArgumentParser()
+    parser.add_argument("command", choices=["status", "on", "off", "sync", "dump", "clear", "test"])
+    parser.add_argument("--port")
+    parser.add_argument("-o", "--output", default="tracklog.gpx")
     args = parser.parse_args()
+    iface = meshtastic.serial_interface.SerialInterface(devPath=args.port) if args.port else meshtastic.serial_interface.SerialInterface()
+    points = []
+    complete = False
 
-    cmd_str = f'tracker:{args.command}'
-    print(f'Connecting to Meshtastic device on port {args.port or "auto"}...')
-    try:
-        if args.port:
-            iface = meshtastic.serial_interface.SerialInterface(devPath=args.port)
-        else:
-            iface = meshtastic.serial_interface.SerialInterface()
-    except Exception as e:
-        print(f'Failed to connect: {e}')
-        sys.exit(1)
+    def receive(packet, interface):
+        nonlocal complete
+        text = packet.get("decoded", {}).get("text", "")
+        for line in text.splitlines():
+            if line.startswith("DUMP COMPLETE"):
+                complete = True
+            elif line.startswith("$TRK,"):
+                parts = line.split(",")
+                try:
+                    points.append({"lat": float(parts[1]), "lon": float(parts[2]), "alt": int(parts[3]), "time": int(parts[4])})
+                except (ValueError, IndexError):
+                    pass
 
-    responses = []
-    trackpoints = []
-    dump_complete = False
-
-    def on_receive(packet, interface):
-        nonlocal dump_complete
-        try:
-            if 'decoded' in packet and 'text' in packet.get('decoded', {}):
-                text = packet['decoded']['text']
-                responses.append(text)
-                print(f'[Response] {text}')
-
-                # Support multi-line points in a single packet
-                for line in text.splitlines():
-                    line = line.strip()
-                    if line.startswith('DUMP COMPLETE'):
-                        dump_complete = True
-                    elif line.startswith('$TRK,'):
-                        parts = line.split(',')
-                        if len(parts) >= 6 and parts[1] != 'CORRUPT':
-                            try:
-                                lat = float(parts[1])
-                                lon = float(parts[2])
-                                alt = int(parts[3])
-                                timestamp = int(parts[4])
-                                hdop = int(parts[5])
-                                trackpoints.append({
-                                    "lat": lat, "lon": lon, "alt": alt,
-                                    "time": timestamp, "hdop": hdop
-                                })
-                            except (ValueError, IndexError):
-                                pass
-        except Exception:
-            pass
-
-    pub.subscribe(on_receive, 'meshtastic.receive.text')
-
-    print(f'Sending: {cmd_str}')
-    # Route command strictly to the local node to prevent LoRa RF broadcasting over the air
-    dest = iface.myInfo.my_node_num if (iface.myInfo and hasattr(iface.myInfo, 'my_node_num') and iface.myInfo.my_node_num) else meshtastic.LOCAL_ADDR
-    iface.sendText(cmd_str, destinationId=dest)
-
-    timeout = 25 if args.command == 'dump' else 4
-    start = time.time()
-    last_count = 0
-    while time.time() - start < timeout:
+    pub.subscribe(receive, "meshtastic.receive.text")
+    dest = iface.myInfo.my_node_num if iface.myInfo else meshtastic.LOCAL_ADDR
+    iface.sendText(f"tracker:{args.command}", destinationId=dest)
+    end = time.time() + (25 if args.command == "dump" else 4)
+    while time.time() < end and not complete:
         time.sleep(0.1)
-        if dump_complete:
-            time.sleep(0.5)
-            break
-        if len(responses) > last_count:
-            last_count = len(responses)
-            if args.command == 'dump':
-                start = time.time() # Keep extending while data arrives
-
     iface.close()
+    if args.command == "dump" and points:
+        export_to_gpx(points, args.output)
 
-    if not responses:
-        print('No response received (device might be busy).')
-    else:
-        print(f'Finished. Received {len(responses)} packet(s), {len(trackpoints)} trackpoint(s).')
 
-    if args.command == 'dump' and trackpoints:
-        export_to_gpx(trackpoints, args.output)
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
