@@ -1,14 +1,10 @@
 .vexp/
 __pycache__/
 *.pyc
-
-# Local/system caches and generated build output
-%SystemDrive%/
-%SystemDrive%*
 .friday/
 .dummy/
 .pio/
 .vscode/
 file-attachments/
-**/__pycache__/
-*.pyc
+%SystemDrive%/
+%SystemDrive%*
