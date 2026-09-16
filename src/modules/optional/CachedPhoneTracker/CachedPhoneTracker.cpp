@@ -58,20 +58,59 @@ bool CachedPhoneTracker::wantPacket(const meshtastic_MeshPacket *p)
     return (p->decoded.portnum == meshtastic_PortNum_TEXT_MESSAGE_APP);
 }
 
+
+static void playDirectTone(uint16_t freq, uint16_t duration_ms)
+{
+#if defined(BUZZER_EN_PIN)
+    pinMode(BUZZER_EN_PIN, OUTPUT);
+    digitalWrite(BUZZER_EN_PIN, HIGH);
+#endif
+#if defined(PIN_BUZZER)
+    tone(PIN_BUZZER, freq, duration_ms);
+    delay(duration_ms + 10);
+    noTone(PIN_BUZZER);
+#endif
+#if defined(BUZZER_EN_PIN)
+    digitalWrite(BUZZER_EN_PIN, LOW);
+#endif
+}
+
+static void playTrackerChime(bool ascending)
+{
+    if (ascending) {
+        playDirectTone(2000, 70);
+        delay(30);
+        playDirectTone(2400, 70);
+        delay(30);
+        playDirectTone(2800, 120);
+    } else {
+        playDirectTone(2800, 70);
+        delay(30);
+        playDirectTone(2400, 70);
+        delay(30);
+        playDirectTone(2000, 120);
+    }
+}
+
+static void playPointLoggedBeep()
+{
+    playDirectTone(2700, 80);
+}
+
 void CachedPhoneTracker::toggleTrackerMode()
 {
     trackerModeActive = !trackerModeActive;
     pinMode(PIN_LED1, OUTPUT);
     if (trackerModeActive) {
         digitalWrite(PIN_LED1, LED_STATE_ON);
-        play4ClickUp();
+        playTrackerChime(true);
         if (cachedPhoneTracker) {
             cachedPhoneTracker->last_capture_ms = 0; // Trigger capture as soon as GPS fixes
         }
         LOG_INFO("CachedPhoneTracker: Tracker Mode ON (1 pt/min)\n");
     } else {
         digitalWrite(PIN_LED1, !LED_STATE_ON);
-        play4ClickDown();
+        playTrackerChime(false);
         LOG_INFO("CachedPhoneTracker: Tracker Mode OFF (cache preserved)\n");
     }
 }
@@ -271,6 +310,7 @@ int32_t CachedPhoneTracker::runOnce()
     digitalWrite(PIN_LED1, !LED_STATE_ON);
     delay(50);
     digitalWrite(PIN_LED1, LED_STATE_ON);
+    playPointLoggedBeep();
 
     LOG_INFO("CachedPhoneTracker: logged 1-min point #%u lat=%.6f lon=%.6f time=%u (cache=%u/%u)\n",
              point_count, lat_i * 1e-7, lon_i * 1e-7, validTime, cache_count, MAX_CACHED_POSITIONS);
@@ -455,6 +495,8 @@ void CachedPhoneTracker::startSync()
 ProcessMessage CachedPhoneTracker::handleReceived(const meshtastic_MeshPacket &mp)
 {
     if (mp.decoded.portnum != meshtastic_PortNum_TEXT_MESSAGE_APP)
+        return ProcessMessage::CONTINUE;
+    if (!isFromUs(&mp))
         return ProcessMessage::CONTINUE;
 
     const char *payload = (const char *)mp.decoded.payload.bytes;

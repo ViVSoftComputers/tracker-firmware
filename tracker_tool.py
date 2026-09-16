@@ -112,7 +112,9 @@ def main():
     pub.subscribe(on_receive, 'meshtastic.receive.text')
 
     print(f'Sending: {cmd_str}')
-    iface.sendText(cmd_str)
+    # Route command strictly to the local node to prevent LoRa RF broadcasting over the air
+    dest = iface.myInfo.my_node_num if (iface.myInfo and hasattr(iface.myInfo, 'my_node_num') and iface.myInfo.my_node_num) else meshtastic.LOCAL_ADDR
+    iface.sendText(cmd_str, destinationId=dest)
 
     timeout = 25 if args.command == 'dump' else 4
     start = time.time()
