@@ -1,0 +1,199 @@
+[2m2026-09-15T15:37:01.586071Z[0m [32m INFO[0m license: home_dir=C:\Users\vivso (source=os)
+[2m2026-09-15T15:37:01.586496Z[0m [32m INFO[0m license: using license.jwt (C:\Users\vivso\.vexp\license.jwt) → plan=tier3 max_nodes=100000
+[2m2026-09-15T15:37:01.586852Z[0m [33m WARN[0m LIFECYCLE: this daemon is inside a Windows job object. It does not kill its members on close, so the daemon should survive the launching tool — but a job can also cap memory and CPU, and those limits apply here.
+[2m2026-09-15T15:37:01.597763Z[0m [32m INFO[0m Updated vexp section in existing pre-commit hook
+[2m2026-09-15T15:37:01.605082Z[0m [32m INFO[0m Updated vexp section in existing post-merge hook
+[2m2026-09-15T15:37:01.616564Z[0m [32m INFO[0m Updated vexp section in existing post-checkout hook
+[2m2026-09-15T15:37:01.617591Z[0m [32m INFO[0m Created .vexp/.gitattributes
+[2m2026-09-15T15:37:01.639527Z[0m [32m INFO[0m vexp git hooks installed in C:\Users\vivso\Documents\Friday\DEV\Meshtastic
+[2m2026-09-15T15:37:01.647193Z[0m [32m INFO[0m Opening database at C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.vexp\index.db
+[2m2026-09-15T15:37:01.664393Z[0m [32m INFO[0m SecurityFilter active — skipping built-in secret paths
+[2m2026-09-15T15:37:01.668297Z[0m [32m INFO[0m Manifest found, running incremental sync
+[2m2026-09-15T15:37:01.675445Z[0m [32m INFO[0m Running checkout sync
+[2m2026-09-15T15:37:03.986387Z[0m [32m INFO[0m Manifest written: 1648 file hashes
+[2m2026-09-15T15:37:05.462551Z[0m [32m INFO[0m File watcher: monitorando C:\Users\vivso\Documents\Friday\DEV\Meshtastic (1640 directories)
+[2m2026-09-15T15:37:05.492535Z[0m [32m INFO[0m LLM compression enabled (vexp-devmind-v1)
+[2m2026-09-15T15:37:05.540992Z[0m [32m INFO[0m ggml backends registered: 2
+[2m2026-09-15T15:37:05.541094Z[0m [32m INFO[0m LLM: requesting GPU offload (n_gpu_layers=999)
+[2m2026-09-15T15:37:06.616665Z[0m [33m WARN[0m [1mload_from_file[0m[2m:[0m control-looking token:     50 '<|tool_response>' was not control-type; this is probably a bug in the model. its type will be overridden [3mmodule[0m[2m=[0m"llama.cpp::load"
+[2m2026-09-15T15:37:06.617422Z[0m [33m WARN[0m [1mload_from_file[0m[2m:[0m control-looking token:    212 '</s>' was not control-type; this is probably a bug in the model. its type will be overridden [3mmodule[0m[2m=[0m"llama.cpp::load"
+[2m2026-09-15T15:37:06.685210Z[0m [33m WARN[0m [1mload_from_file[0m[2m:[0m special_eos_id is not in special_eog_ids - the tokenizer config may be incorrect [3mmodule[0m[2m=[0m"llama.cpp::load"
+[2m2026-09-15T15:37:06.742096Z[0m [33m WARN[0m [1mload_from_file[0m[2m:[0m cannot properly format tensor name output with suffix=weight bid=-1 xid=-1 [3mmodule[0m[2m=[0m"llama.cpp::str"
+[2m2026-09-15T15:37:08.711096Z[0m [33m WARN[0m n_ctx_seq (4096) < n_ctx_train (131072) -- the full capacity of the model will not be utilized [3mmodule[0m[2m=[0m"llama.cpp::llama_context"
+[2m2026-09-15T15:37:08.712330Z[0m [33m WARN[0m using full-size SWA cache (ref: https://github.com/ggml-org/llama.cpp/pull/13194#issuecomment-2868343055) [3mmodule[0m[2m=[0m"llama.cpp::llama_kv_cache_iswa"
+[2m2026-09-15T15:37:09.294289Z[0m [32m INFO[0m LLM model loaded and warmed up: C:\Users\vivso\AppData\Roaming\vexp\models\vexp-devmind-v1\vexp-devmind-v1-Q4_K_M.gguf (gpu=false)
+[2m2026-09-15T15:37:09.294328Z[0m [32m INFO[0m LLM: GPU offload was requested but no usable GPU device was found — running on CPU
+[2m2026-09-15T15:37:09.298350Z[0m [32m INFO[0m LLM inference mode: CPU
+[2m2026-09-15T15:37:09.299024Z[0m [32m INFO[0m LlmWorker active (id: vexp-devmind-v1)
+[2m2026-09-15T15:37:09.299575Z[0m [32m INFO[0m vexp-core daemon started (v3.1.1), watching for changes
+[2m2026-09-15T15:45:13.569024Z[0m [32m INFO[0m CallResolver: scanning 8364 callable nodes (0 LSP edges pre-integrated; the VS Code bridge adds type-resolved edges incrementally as files are opened)
+[2m2026-09-15T15:45:14.261863Z[0m [32m INFO[0m CallResolver: created 10436 CALLS edges
+[2m2026-09-15T15:45:25.248575Z[0m [32m INFO[0m TF-IDF corpus: 11097 documents, 18683 unique terms
+[2m2026-09-15T16:00:59.689061Z[0m [32m INFO[0m CallResolver: scanning 8364 callable nodes (0 LSP edges pre-integrated; the VS Code bridge adds type-resolved edges incrementally as files are opened)
+[2m2026-09-15T16:01:00.764969Z[0m [32m INFO[0m CallResolver: created 10436 CALLS edges
+[2m2026-09-15T16:01:15.910807Z[0m [32m INFO[0m TF-IDF corpus: 11097 documents, 18683 unique terms
+[2m2026-09-15T16:03:57.093172Z[0m [32m INFO[0m CallResolver: scanning 8366 callable nodes (0 LSP edges pre-integrated; the VS Code bridge adds type-resolved edges incrementally as files are opened)
+[2m2026-09-15T16:03:58.582110Z[0m [32m INFO[0m CallResolver: created 10431 CALLS edges
+[2m2026-09-15T16:04:16.548972Z[0m [32m INFO[0m TF-IDF corpus: 11099 documents, 18684 unique terms
+[2m2026-09-15T16:11:53.501793Z[0m [32m INFO[0m CallResolver: scanning 8366 callable nodes (0 LSP edges pre-integrated; the VS Code bridge adds type-resolved edges incrementally as files are opened)
+[2m2026-09-15T16:11:54.385181Z[0m [32m INFO[0m CallResolver: created 10431 CALLS edges
+[2m2026-09-15T16:12:07.374230Z[0m [32m INFO[0m TF-IDF corpus: 11097 documents, 18684 unique terms
+[2m2026-09-15T16:17:01.028066Z[0m [32m INFO[0m CallResolver: scanning 8366 callable nodes (0 LSP edges pre-integrated; the VS Code bridge adds type-resolved edges incrementally as files are opened)
+[2m2026-09-15T16:17:01.865265Z[0m [32m INFO[0m CallResolver: created 10431 CALLS edges
+[2m2026-09-15T16:17:12.718607Z[0m [32m INFO[0m TF-IDF corpus: 11097 documents, 18688 unique terms
+[2m2026-09-15T16:21:38.358508Z[0m [32m INFO[0m CallResolver: scanning 8366 callable nodes (0 LSP edges pre-integrated; the VS Code bridge adds type-resolved edges incrementally as files are opened)
+[2m2026-09-15T16:21:38.985767Z[0m [32m INFO[0m CallResolver: created 10431 CALLS edges
+[2m2026-09-15T16:21:51.083534Z[0m [32m INFO[0m TF-IDF corpus: 11107 documents, 18693 unique terms
+[2m2026-09-15T16:48:02.518795Z[0m [32m INFO[0m CallResolver: scanning 8366 callable nodes (0 LSP edges pre-integrated; the VS Code bridge adds type-resolved edges incrementally as files are opened)
+[2m2026-09-15T16:48:03.259958Z[0m [32m INFO[0m CallResolver: created 10431 CALLS edges
+[2m2026-09-15T16:48:15.787590Z[0m [32m INFO[0m TF-IDF corpus: 11107 documents, 18693 unique terms
+[2m2026-09-15T16:50:35.201181Z[0m [32m INFO[0m CallResolver: scanning 8366 callable nodes (0 LSP edges pre-integrated; the VS Code bridge adds type-resolved edges incrementally as files are opened)
+[2m2026-09-15T16:50:35.930142Z[0m [32m INFO[0m CallResolver: created 10431 CALLS edges
+[2m2026-09-15T16:50:52.650671Z[0m [32m INFO[0m TF-IDF corpus: 11107 documents, 18693 unique terms
+[2m2026-09-15T16:53:49.948026Z[0m [32m INFO[0m CallResolver: scanning 8366 callable nodes (0 LSP edges pre-integrated; the VS Code bridge adds type-resolved edges incrementally as files are opened)
+[2m2026-09-15T16:53:50.480673Z[0m [32m INFO[0m CallResolver: created 10431 CALLS edges
+[2m2026-09-15T16:54:02.596005Z[0m [32m INFO[0m TF-IDF corpus: 11104 documents, 18687 unique terms
+[2m2026-09-15T19:10:44.406114Z[0m [32m INFO[0m CallResolver: scanning 8366 callable nodes (0 LSP edges pre-integrated; the VS Code bridge adds type-resolved edges incrementally as files are opened)
+[2m2026-09-15T19:10:44.959015Z[0m [32m INFO[0m CallResolver: created 10431 CALLS edges
+[2m2026-09-15T19:11:00.040379Z[0m [32m INFO[0m TF-IDF corpus: 11104 documents, 18689 unique terms
+[2m2026-09-15T19:17:29.384625Z[0m [32m INFO[0m CallResolver: scanning 8366 callable nodes (0 LSP edges pre-integrated; the VS Code bridge adds type-resolved edges incrementally as files are opened)
+[2m2026-09-15T19:17:30.214607Z[0m [32m INFO[0m CallResolver: created 10431 CALLS edges
+[2m2026-09-15T19:17:42.038461Z[0m [32m INFO[0m TF-IDF corpus: 11104 documents, 18688 unique terms
+[2m2026-09-15T19:38:25.640876Z[0m [32m INFO[0m CallResolver: scanning 8366 callable nodes (0 LSP edges pre-integrated; the VS Code bridge adds type-resolved edges incrementally as files are opened)
+[2m2026-09-15T19:38:26.258832Z[0m [32m INFO[0m CallResolver: created 10431 CALLS edges
+[2m2026-09-15T19:38:41.856204Z[0m [32m INFO[0m TF-IDF corpus: 11105 documents, 18690 unique terms
+[2m2026-09-15T19:41:22.624221Z[0m [32m INFO[0m CallResolver: scanning 8366 callable nodes (0 LSP edges pre-integrated; the VS Code bridge adds type-resolved edges incrementally as files are opened)
+[2m2026-09-15T19:41:23.650850Z[0m [32m INFO[0m CallResolver: created 10431 CALLS edges
+[2m2026-09-15T19:41:42.387916Z[0m [32m INFO[0m TF-IDF corpus: 11105 documents, 18693 unique terms
+[2m2026-09-15T19:45:02.880530Z[0m [32m INFO[0m CallResolver: scanning 8366 callable nodes (0 LSP edges pre-integrated; the VS Code bridge adds type-resolved edges incrementally as files are opened)
+[2m2026-09-15T19:45:03.715301Z[0m [32m INFO[0m CallResolver: created 10431 CALLS edges
+[2m2026-09-15T19:45:19.030543Z[0m [32m INFO[0m TF-IDF corpus: 11105 documents, 18693 unique terms
+[2m2026-09-15T20:43:26.362118Z[0m [32m INFO[0m CallResolver: scanning 8366 callable nodes (0 LSP edges pre-integrated; the VS Code bridge adds type-resolved edges incrementally as files are opened)
+[2m2026-09-15T20:43:27.001874Z[0m [32m INFO[0m CallResolver: created 10431 CALLS edges
+[2m2026-09-15T20:43:43.794722Z[0m [32m INFO[0m TF-IDF corpus: 11107 documents, 18697 unique terms
+[2m2026-09-15T20:46:33.588656Z[0m [32m INFO[0m CallResolver: scanning 8366 callable nodes (0 LSP edges pre-integrated; the VS Code bridge adds type-resolved edges incrementally as files are opened)
+[2m2026-09-15T20:46:34.380282Z[0m [32m INFO[0m CallResolver: created 10431 CALLS edges
+[2m2026-09-15T20:46:50.628388Z[0m [32m INFO[0m TF-IDF corpus: 11107 documents, 18697 unique terms
+[2m2026-09-15T21:03:35.989922Z[0m [32m INFO[0m CallResolver: scanning 8366 callable nodes (0 LSP edges pre-integrated; the VS Code bridge adds type-resolved edges incrementally as files are opened)
+[2m2026-09-15T21:03:36.609083Z[0m [32m INFO[0m CallResolver: created 10431 CALLS edges
+[2m2026-09-15T21:03:54.302568Z[0m [32m INFO[0m TF-IDF corpus: 11107 documents, 18697 unique terms
+[2m2026-09-15T21:07:02.958221Z[0m [32m INFO[0m CallResolver: scanning 8366 callable nodes (0 LSP edges pre-integrated; the VS Code bridge adds type-resolved edges incrementally as files are opened)
+[2m2026-09-15T21:07:03.672437Z[0m [32m INFO[0m CallResolver: created 10431 CALLS edges
+[2m2026-09-15T21:07:18.663346Z[0m [32m INFO[0m TF-IDF corpus: 11107 documents, 18696 unique terms
+[2m2026-09-16T12:51:29.865738Z[0m [32m INFO[0m CallResolver: scanning 8366 callable nodes (0 LSP edges pre-integrated; the VS Code bridge adds type-resolved edges incrementally as files are opened)
+[2m2026-09-16T12:51:31.016158Z[0m [32m INFO[0m CallResolver: created 10431 CALLS edges
+[2m2026-09-16T12:51:45.279211Z[0m [32m INFO[0m TF-IDF corpus: 11107 documents, 18696 unique terms
+[2m2026-09-16T12:54:25.022620Z[0m [32m INFO[0m CallResolver: scanning 8366 callable nodes (0 LSP edges pre-integrated; the VS Code bridge adds type-resolved edges incrementally as files are opened)
+[2m2026-09-16T12:54:26.635686Z[0m [32m INFO[0m CallResolver: created 10432 CALLS edges
+[2m2026-09-16T12:54:41.711439Z[0m [32m INFO[0m TF-IDF corpus: 11107 documents, 18696 unique terms
+[2m2026-09-16T12:57:29.996666Z[0m [32m INFO[0m CallResolver: scanning 8366 callable nodes (0 LSP edges pre-integrated; the VS Code bridge adds type-resolved edges incrementally as files are opened)
+[2m2026-09-16T12:57:31.061101Z[0m [32m INFO[0m CallResolver: created 10432 CALLS edges
+[2m2026-09-16T12:57:46.773168Z[0m [32m INFO[0m TF-IDF corpus: 11107 documents, 18696 unique terms
+[2m2026-09-16T13:04:31.201927Z[0m [32m INFO[0m CallResolver: scanning 8366 callable nodes (0 LSP edges pre-integrated; the VS Code bridge adds type-resolved edges incrementally as files are opened)
+[2m2026-09-16T13:04:31.832867Z[0m [32m INFO[0m CallResolver: created 10432 CALLS edges
+[2m2026-09-16T13:04:44.435707Z[0m [32m INFO[0m TF-IDF corpus: 11107 documents, 18695 unique terms
+[2m2026-09-16T13:15:24.759702Z[0m [32m INFO[0m Index rules changed (config/ignore) — reconciling served repos without restart
+[2m2026-09-16T13:15:28.160162Z[0m [32m INFO[0m index skip (minified asset): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/esp32_https_server/examples/REST-API/data/public/jquery-3.3.1.min.js
+[2m2026-09-16T13:15:28.160164Z[0m [32m INFO[0m index skip (minified asset): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/esp32_https_server/examples/REST-API/data/public/jquery-3.3.1.min.js
+[2m2026-09-16T13:15:28.778225Z[0m [32m INFO[0m index skip (747 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0303.h
+[2m2026-09-16T13:15:28.778448Z[0m [32m INFO[0m index skip (747 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0304.h
+[2m2026-09-16T13:15:28.778638Z[0m [32m INFO[0m index skip (747 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0305.h
+[2m2026-09-16T13:15:28.778796Z[0m [32m INFO[0m index skip (747 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0306.h
+[2m2026-09-16T13:15:28.778991Z[0m [32m INFO[0m index skip (748 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0307.h
+[2m2026-09-16T13:15:28.779177Z[0m [32m INFO[0m index skip (747 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0308.h
+[2m2026-09-16T13:15:28.779312Z[0m [32m INFO[0m index skip (751 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0401.h
+[2m2026-09-16T13:15:28.779439Z[0m [32m INFO[0m index skip (751 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0402.h
+[2m2026-09-16T13:15:28.779559Z[0m [32m INFO[0m index skip (747 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0303.h
+[2m2026-09-16T13:15:28.779563Z[0m [32m INFO[0m index skip (748 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1120_transceiver_0101.h
+[2m2026-09-16T13:15:28.779685Z[0m [32m INFO[0m index skip (747 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0304.h
+[2m2026-09-16T13:15:28.779690Z[0m [32m INFO[0m index skip (748 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1120_transceiver_0102.h
+[2m2026-09-16T13:15:28.779815Z[0m [32m INFO[0m index skip (747 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0305.h
+[2m2026-09-16T13:15:28.779832Z[0m [32m INFO[0m index skip (751 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1120_transceiver_0201.h
+[2m2026-09-16T13:15:28.779936Z[0m [32m INFO[0m index skip (747 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0306.h
+[2m2026-09-16T13:15:28.779956Z[0m [32m INFO[0m index skip (751 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1120_transceiver_0202.h
+[2m2026-09-16T13:15:28.780105Z[0m [32m INFO[0m index skip (748 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0307.h
+[2m2026-09-16T13:15:28.780212Z[0m [32m INFO[0m index skip (747 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0308.h
+[2m2026-09-16T13:15:28.780333Z[0m [32m INFO[0m index skip (751 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0401.h
+[2m2026-09-16T13:15:28.780442Z[0m [32m INFO[0m index skip (751 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0402.h
+[2m2026-09-16T13:15:28.780548Z[0m [32m INFO[0m index skip (748 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1120_transceiver_0101.h
+[2m2026-09-16T13:15:28.780656Z[0m [32m INFO[0m index skip (748 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1120_transceiver_0102.h
+[2m2026-09-16T13:15:28.780769Z[0m [32m INFO[0m index skip (751 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1120_transceiver_0201.h
+[2m2026-09-16T13:15:28.780872Z[0m [32m INFO[0m index skip (751 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1120_transceiver_0202.h
+[2m2026-09-16T13:15:28.973057Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic: sweeping 1371 existing file(s) into the index
+[2m2026-09-16T13:15:29.055715Z[0m [32m INFO[0m Reconciliation: 3015 files out of sync with the index (1645 deleted) — syncing
+[2m2026-09-16T13:16:26.070361Z[0m [32m INFO[0m CallResolver: scanning 6592 callable nodes (0 LSP edges pre-integrated; the VS Code bridge adds type-resolved edges incrementally as files are opened)
+[2m2026-09-16T13:16:27.065618Z[0m [32m INFO[0m CallResolver: created 4650 CALLS edges
+[2m2026-09-16T13:16:44.495464Z[0m [32m INFO[0m TF-IDF corpus: 10078 documents, 15075 unique terms
+[2m2026-09-16T13:17:27.252410Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Adafruit ADS1X15: sweeping 5 existing file(s) into the index
+[2m2026-09-16T13:17:27.279385Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Adafruit AHTX0: sweeping 6 existing file(s) into the index
+[2m2026-09-16T13:17:27.307885Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Adafruit BME280 Library: sweeping 5 existing file(s) into the index
+[2m2026-09-16T13:17:27.341819Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Adafruit BME680 Library: sweeping 8 existing file(s) into the index
+[2m2026-09-16T13:17:27.365900Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Adafruit BMP085 Library: sweeping 5 existing file(s) into the index
+[2m2026-09-16T13:17:27.382448Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Adafruit BMP280 Library: sweeping 5 existing file(s) into the index
+[2m2026-09-16T13:17:27.409062Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Adafruit BMP3XX Library: sweeping 8 existing file(s) into the index
+[2m2026-09-16T13:17:27.431353Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Adafruit BusIO: sweeping 12 existing file(s) into the index
+[2m2026-09-16T13:17:27.479355Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Adafruit DPS310: sweeping 6 existing file(s) into the index
+[2m2026-09-16T13:17:27.498815Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Adafruit DS248x: sweeping 6 existing file(s) into the index
+[2m2026-09-16T13:17:27.542162Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Adafruit GFX Library: sweeping 70 existing file(s) into the index
+[2m2026-09-16T13:17:27.752992Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Adafruit INA219: sweeping 6 existing file(s) into the index
+[2m2026-09-16T13:17:27.782006Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Adafruit INA260 Library: sweeping 6 existing file(s) into the index
+[2m2026-09-16T13:17:27.801495Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Adafruit LIS3DH: sweeping 6 existing file(s) into the index
+[2m2026-09-16T13:17:27.820872Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Adafruit LPS2X: sweeping 8 existing file(s) into the index
+[2m2026-09-16T13:17:27.864940Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Adafruit LSM6DS: sweeping 20 existing file(s) into the index
+[2m2026-09-16T13:17:27.948792Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Adafruit LTR390 Library: sweeping 5 existing file(s) into the index
+[2m2026-09-16T13:17:27.962836Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Adafruit MAX1704X: sweeping 6 existing file(s) into the index
+[2m2026-09-16T13:17:27.979369Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Adafruit MCP9808 Library: sweeping 6 existing file(s) into the index
+[2m2026-09-16T13:17:27.996495Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Adafruit MLX90614 Library: sweeping 6 existing file(s) into the index
+[2m2026-09-16T13:17:28.028345Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Adafruit MPU6050: sweeping 6 existing file(s) into the index
+[2m2026-09-16T13:17:28.065044Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Adafruit NeoPixel: sweeping 16 existing file(s) into the index
+[2m2026-09-16T13:17:28.130837Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Adafruit SH110X: sweeping 8 existing file(s) into the index
+[2m2026-09-16T13:17:28.170828Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Adafruit SPA06_003: sweeping 4 existing file(s) into the index
+[2m2026-09-16T13:17:28.196374Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Adafruit SSD1306: sweeping 7 existing file(s) into the index
+[2m2026-09-16T13:17:28.215900Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Adafruit TSL2561: sweeping 5 existing file(s) into the index
+[2m2026-09-16T13:17:28.228092Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Adafruit TSL2591 Library: sweeping 5 existing file(s) into the index
+[2m2026-09-16T13:17:28.253676Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Adafruit Unified Sensor: sweeping 3 existing file(s) into the index
+[2m2026-09-16T13:17:28.269380Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Adafruit VEML7700 Library: sweeping 5 existing file(s) into the index
+[2m2026-09-16T13:17:29.028803Z[0m [32m INFO[0m index skip (minified asset): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/esp32_https_server/examples/REST-API/data/public/jquery-3.3.1.min.js
+[2m2026-09-16T13:17:29.048377Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\esp32_https_server: sweeping 161 existing file(s) into the index
+[2m2026-09-16T13:17:30.487479Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\ESP8266 and ESP32 OLED driver for SSD1306 displays: sweeping 28 existing file(s) into the index
+[2m2026-09-16T13:17:30.579725Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Fusion: sweeping 36 existing file(s) into the index
+[2m2026-09-16T13:17:30.627992Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Grove - Laser PM2.5 Sensor HM3301: sweeping 6 existing file(s) into the index
+[2m2026-09-16T13:17:30.657997Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\ICM42670P: sweeping 22 existing file(s) into the index
+[2m2026-09-16T13:17:30.704771Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\INA226: sweeping 6 existing file(s) into the index
+[2m2026-09-16T13:17:30.752186Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\INA3221: sweeping 6 existing file(s) into the index
+[2m2026-09-16T13:17:31.206529Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Nanopb: sweeping 213 existing file(s) into the index
+[2m2026-09-16T13:17:32.371528Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\NonBlockingRTTTL: sweeping 20 existing file(s) into the index
+[2m2026-09-16T13:17:32.405363Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\NTPClient: sweeping 3 existing file(s) into the index
+[2m2026-09-16T13:17:32.452678Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\OneButton: sweeping 7 existing file(s) into the index
+[2m2026-09-16T13:17:32.883807Z[0m [32m INFO[0m index skip (747 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0303.h
+[2m2026-09-16T13:17:32.884224Z[0m [32m INFO[0m index skip (747 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0304.h
+[2m2026-09-16T13:17:32.884529Z[0m [32m INFO[0m index skip (747 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0305.h
+[2m2026-09-16T13:17:32.884792Z[0m [32m INFO[0m index skip (747 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0306.h
+[2m2026-09-16T13:17:32.885036Z[0m [32m INFO[0m index skip (748 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0307.h
+[2m2026-09-16T13:17:32.885267Z[0m [32m INFO[0m index skip (747 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0308.h
+[2m2026-09-16T13:17:32.885504Z[0m [32m INFO[0m index skip (751 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0401.h
+[2m2026-09-16T13:17:32.885734Z[0m [32m INFO[0m index skip (751 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0402.h
+[2m2026-09-16T13:17:32.885968Z[0m [32m INFO[0m index skip (748 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1120_transceiver_0101.h
+[2m2026-09-16T13:17:32.886194Z[0m [32m INFO[0m index skip (748 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1120_transceiver_0102.h
+[2m2026-09-16T13:17:32.886407Z[0m [32m INFO[0m index skip (751 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1120_transceiver_0201.h
+[2m2026-09-16T13:17:32.886612Z[0m [32m INFO[0m index skip (751 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1120_transceiver_0202.h
+[2m2026-09-16T13:17:32.947892Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\RadioLib: sweeping 223 existing file(s) into the index
+[2m2026-09-16T13:17:33.715818Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Sensirion Core: sweeping 19 existing file(s) into the index
+[2m2026-09-16T13:17:33.757932Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Sensirion I2C SCD30: sweeping 4 existing file(s) into the index
+[2m2026-09-16T13:17:33.788904Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Sensirion I2C SCD4x: sweeping 4 existing file(s) into the index
+[2m2026-09-16T13:17:33.802244Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\Sensirion I2C SFA3x: sweeping 4 existing file(s) into the index
+[2m2026-09-16T13:17:33.872772Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\SparkFun AS3935 Lightning Detector Arduino Library: sweeping 5 existing file(s) into the index
+[2m2026-09-16T13:17:33.917988Z[0m [32m INFO[0m New directory C:\Users\vivso\Documents\Friday\DEV\Meshtastic\.pio\libdeps\heltec-v3\SparkFun MMC5983MA Magnetometer Arduino Library: sweeping 7 existing file(s) into the index
+[2m2026-09-16T13:18:36.037101Z[0m [32m INFO[0m index skip (minified asset): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/esp32_https_server/examples/REST-API/data/public/jquery-3.3.1.min.js
+[2m2026-09-16T13:18:36.312575Z[0m [32m INFO[0m index skip (747 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0303.h
+[2m2026-09-16T13:18:36.312728Z[0m [32m INFO[0m index skip (747 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0304.h
+[2m2026-09-16T13:18:36.312851Z[0m [32m INFO[0m index skip (747 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0305.h
+[2m2026-09-16T13:18:36.312998Z[0m [32m INFO[0m index skip (747 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0306.h
+[2m2026-09-16T13:18:36.313124Z[0m [32m INFO[0m index skip (748 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0307.h
+[2m2026-09-16T13:18:36.313347Z[0m [32m INFO[0m index skip (747 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0308.h
+[2m2026-09-16T13:18:36.313478Z[0m [32m INFO[0m index skip (751 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0401.h
+[2m2026-09-16T13:18:36.313603Z[0m [32m INFO[0m index skip (751 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1110_transceiver_0402.h
+[2m2026-09-16T13:18:36.313727Z[0m [32m INFO[0m index skip (748 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1120_transceiver_0101.h
+[2m2026-09-16T13:18:36.313848Z[0m [32m INFO[0m index skip (748 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1120_transceiver_0102.h
+[2m2026-09-16T13:18:36.313969Z[0m [32m INFO[0m index skip (751 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1120_transceiver_0201.h
+[2m2026-09-16T13:18:36.314091Z[0m [32m INFO[0m index skip (751 KB > max_file_size_kb 512): C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/libdeps/heltec-v3/RadioLib/src/modules/LR11x0/firmware/lr1120_transceiver_0202.h

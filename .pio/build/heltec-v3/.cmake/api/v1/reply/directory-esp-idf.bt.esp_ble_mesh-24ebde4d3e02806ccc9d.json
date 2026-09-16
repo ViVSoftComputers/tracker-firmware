@@ -1,0 +1,14 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : [],
+		"files" : [],
+		"nodes" : []
+	},
+	"installers" : [],
+	"paths" : 
+	{
+		"build" : "esp-idf/bt/esp_ble_mesh",
+		"source" : "C:/pio2/packages/framework-espidf/components/bt/esp_ble_mesh"
+	}
+}

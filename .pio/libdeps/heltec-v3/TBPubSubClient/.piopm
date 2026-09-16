@@ -1,0 +1,1 @@
+{"type": "library", "name": "TBPubSubClient", "version": "2.12.1", "spec": {"owner": null, "id": null, "name": "pubsubclient", "requirements": null, "uri": "https://github.com/thingsboard/pubsubclient/archive/refs/tags/v2.12.1.zip"}}

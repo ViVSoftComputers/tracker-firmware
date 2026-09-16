@@ -1,0 +1,3 @@
+-Wl,-Map=C:/Users/vivso/Documents/Friday/DEV/Meshtastic/.pio/build/heltec-v3/firmware-heltec-v3-2.8.1.572e9bd.map
+-nostartfiles
+-fno-rtti

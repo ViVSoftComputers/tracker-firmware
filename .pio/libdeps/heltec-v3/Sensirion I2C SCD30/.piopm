@@ -1,0 +1,1 @@
+{"type": "library", "name": "Sensirion I2C SCD30", "version": "1.1.1", "spec": {"owner": null, "id": null, "name": "arduino-i2c-scd30", "requirements": null, "uri": "https://github.com/Sensirion/arduino-i2c-scd30/archive/1.1.1.zip"}}
