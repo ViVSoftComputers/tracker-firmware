@@ -8,6 +8,7 @@
 #include "mesh/generated/meshtastic/mesh.pb.h"
 
 #define LED_STATE_ON 1
+#define MIN_VALID_EPOCH 1700000000 // Nov 2023 - filters out 0 / Dec 31, 1969 timestamps
 
 // Default tracker mode to OFF on boot (Requirement 3)
 bool CachedPhoneTracker::trackerModeActive = false;
@@ -92,6 +93,10 @@ void CachedPhoneTracker::replyText(const char *msg)
 
 bool CachedPhoneTracker::sendPositionToPhone(const TrackPoint &pt)
 {
+    if (pt.timestamp < MIN_VALID_EPOCH) {
+        return false;
+    }
+
     meshtastic_MeshPacket *p = packetPool.allocZeroed();
     if (!p)
         return false;
@@ -110,6 +115,7 @@ bool CachedPhoneTracker::sendPositionToPhone(const TrackPoint &pt)
 
     p->to = NODENUM_BROADCAST;
     p->from = nodeDB->getNodeNum();
+    p->rx_time = pt.timestamp;
     p->decoded.portnum = meshtastic_PortNum_POSITION_APP;
     p->decoded.want_response = false;
     p->priority = meshtastic_MeshPacket_Priority_BACKGROUND;
@@ -211,14 +217,29 @@ int32_t CachedPhoneTracker::runOnce()
         gps->enable();
     }
 
-    int32_t lat_i = 0;
-    int32_t lon_i = 0;
-    if (gps && gps->isConnected()) {
-        lat_i = gps->p.latitude_i;
-        lon_i = gps->p.longitude_i;
+    // Require an active GPS lock before logging any coordinates
+    if (!gps || !gps->isConnected() || !gps->hasLock()) {
+        return 3000;
     }
 
+    int32_t lat_i = gps->p.latitude_i;
+    int32_t lon_i = gps->p.longitude_i;
+
     if (lat_i == 0 && lon_i == 0) {
+        return 3000;
+    }
+
+    // Must have a valid timestamp (never 0 / 1969)
+    uint32_t validTime = getValidTime(RTCQuality::RTCQualityGPS);
+    if (validTime < MIN_VALID_EPOCH) {
+        validTime = getValidTime(RTCQuality::RTCQualityDevice);
+    }
+    if (validTime < MIN_VALID_EPOCH && gps->p.time >= MIN_VALID_EPOCH) {
+        validTime = gps->p.time;
+    }
+
+    // Wait until GPS acquires time
+    if (validTime < MIN_VALID_EPOCH) {
         return 3000;
     }
 
@@ -237,10 +258,8 @@ int32_t CachedPhoneTracker::runOnce()
     pos.has_altitude = true;
     pos.HDOP = gps->p.HDOP;
     pos.sats_in_view = gps->p.sats_in_view;
-    pos.time = getValidTime(RTCQuality::RTCQualityGPS, true);
-    if (pos.time == 0)
-        pos.time = getValidTime(RTCQuality::RTCQualityDevice, true);
-    pos.timestamp = pos.time;
+    pos.time = validTime;
+    pos.timestamp = validTime;
 
     appendToCache(pos);
     last_lat_i = lat_i;
@@ -253,14 +272,18 @@ int32_t CachedPhoneTracker::runOnce()
     delay(50);
     digitalWrite(PIN_LED1, LED_STATE_ON);
 
-    LOG_INFO("CachedPhoneTracker: logged 1-min point #%u lat=%.6f lon=%.6f (cache=%u/%u)\n",
-             point_count, lat_i * 1e-7, lon_i * 1e-7, cache_count, MAX_CACHED_POSITIONS);
+    LOG_INFO("CachedPhoneTracker: logged 1-min point #%u lat=%.6f lon=%.6f time=%u (cache=%u/%u)\n",
+             point_count, lat_i * 1e-7, lon_i * 1e-7, validTime, cache_count, MAX_CACHED_POSITIONS);
 
     return 3000;
 }
 
 void CachedPhoneTracker::appendToCache(const meshtastic_Position &pos)
 {
+    if (pos.timestamp < MIN_VALID_EPOCH) {
+        return;
+    }
+
     TrackPoint pt;
     pt.timestamp = pos.timestamp;
     pt.lat_i = pos.latitude_i;
@@ -292,6 +315,7 @@ void CachedPhoneTracker::appendToCache(const meshtastic_Position &pos)
 
 bool CachedPhoneTracker::readCachedEntry(uint16_t index, TrackPoint &pt)
 {
+    memset(&pt, 0, sizeof(TrackPoint));
     if (index >= MAX_CACHED_POSITIONS || !FSCom.exists(CACHE_PATH))
         return false;
 
@@ -300,14 +324,30 @@ bool CachedPhoneTracker::readCachedEntry(uint16_t index, TrackPoint &pt)
         return false;
 
     uint32_t readPos = (uint32_t)index * sizeof(TrackPoint);
+    if (readPos + sizeof(TrackPoint) > f.size()) {
+        f.close();
+        return false;
+    }
+
     f.seek(readPos);
     bool ok = (f.read((uint8_t *)&pt, sizeof(TrackPoint)) == sizeof(TrackPoint));
     f.close();
+
+    // Guard against corrupt or 1969 timestamps
+    if (ok && pt.timestamp < MIN_VALID_EPOCH) {
+        return false;
+    }
     return ok;
 }
 
 void CachedPhoneTracker::saveCacheIndex()
 {
+    // On Adafruit_LittleFS (nRF52), FILE_O_WRITE appends.
+    // We MUST remove the index file first to ensure a clean overwrite.
+    if (FSCom.exists(INDEX_PATH)) {
+        FSCom.remove(INDEX_PATH);
+    }
+
     File f = FSCom.open(INDEX_PATH, FILE_O_WRITE);
     if (!f)
         return;
@@ -336,6 +376,7 @@ void CachedPhoneTracker::loadCacheIndex()
         cache_count = data[0];
         cache_head = data[1];
         cache_tail = data[2];
+
         if (cache_count > MAX_CACHED_POSITIONS)
             cache_count = 0;
         if (cache_head >= MAX_CACHED_POSITIONS)
@@ -344,6 +385,22 @@ void CachedPhoneTracker::loadCacheIndex()
             cache_tail = 0;
     }
     f.close();
+
+    // Verify cache_count matches physical file size
+    if (FSCom.exists(CACHE_PATH)) {
+        File cf = FSCom.open(CACHE_PATH, FILE_O_READ);
+        if (cf) {
+            size_t actualSize = cf.size();
+            cf.close();
+            size_t maxPossiblePoints = actualSize / sizeof(TrackPoint);
+            if (cache_count > maxPossiblePoints) {
+                cache_count = maxPossiblePoints;
+            }
+        }
+    } else if (cache_count > 0) {
+        // Points file does not exist, reset corrupted index
+        clearCache();
+    }
 }
 
 void CachedPhoneTracker::clearCache()
@@ -355,6 +412,9 @@ void CachedPhoneTracker::clearCache()
     syncActive = false;
     if (FSCom.exists(CACHE_PATH)) {
         FSCom.remove(CACHE_PATH);
+    }
+    if (FSCom.exists(INDEX_PATH)) {
+        FSCom.remove(INDEX_PATH);
     }
     saveCacheIndex();
     LOG_INFO("CachedPhoneTracker: Cache cleared\n");
@@ -386,6 +446,9 @@ void CachedPhoneTracker::startSync()
     syncTotalToSend = cache_count;
     syncSentCount = 0;
     setIntervalFromNow(10);
+    char startBuf[64];
+    snprintf(startBuf, sizeof(startBuf), "SYNC STARTED: %u points", cache_count);
+    replyText(startBuf);
     LOG_INFO("CachedPhoneTracker: Starting sync of %u points to phone app\n", syncTotalToSend);
 }
 
@@ -473,10 +536,13 @@ ProcessMessage CachedPhoneTracker::handleReceived(const meshtastic_MeshPacket &m
         pos.has_latitude_i = true;
         pos.has_longitude_i = true;
         pos.has_altitude = true;
-        pos.time = getValidTime(RTCQuality::RTCQualityGPS, true);
-        if (pos.time == 0)
-            pos.time = 1789437732;
-        pos.timestamp = pos.time;
+        uint32_t t = getValidTime(RTCQuality::RTCQualityGPS);
+        if (t < MIN_VALID_EPOCH)
+            t = getValidTime(RTCQuality::RTCQualityDevice);
+        if (t < MIN_VALID_EPOCH)
+            t = 1773662400; // 2026 fallback for synthetic test
+        pos.time = t;
+        pos.timestamp = t;
 
         appendToCache(pos);
         point_count++;
