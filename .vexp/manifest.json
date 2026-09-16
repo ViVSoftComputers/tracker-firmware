@@ -1374,8 +1374,8 @@
     "tools/tracker_tool.py": "e5c28d2077808e2c7949badf73ef15b20f8350e2d8164ab9ce9aa8277a6ec3bf",
     "tracker_tool.py": "d3fd01e8f0264af10d983f21a60490c46c2726de2083967dbd581e07a604e7ba"
   },
-  "indexed_at_commit": "307e4b908ca96a4a4f7086b51adbb748b1c066f0",
-  "indexed_at_timestamp": "2026-09-16T14:19:04.818488+00:00",
+  "indexed_at_commit": "98bbd42bc2d027e41af0b66a6d9fed726dfb73cb",
+  "indexed_at_timestamp": "2026-09-16T14:23:17.799291300+00:00",
   "schema_version": 3,
   "stats": {
     "total_edges": 13419,
