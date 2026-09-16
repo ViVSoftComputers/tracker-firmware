@@ -11,7 +11,7 @@ using namespace concurrency;
 
 ButtonThread::ButtonThread() : concurrency::OSThread("Button") {}
 
-int32_t ButtonThread::runOnce()
+int32_t ButtonThread::runOne()
 {
     // Minimal stub: button handling for nRF52 platforms is managed by
     // OneButton callbacks registered in the variant's init() or main().
@@ -26,29 +26,34 @@ int32_t ButtonThread::runOnce()
 }
 
 // Static handler for multi-click events — called from OneButton ISR context
+// v3.0.0 Gesture Map:
+//   1 click  → Manual waypoint log (powers GPS, chirps on lock)
+//   2 clicks → Toggle Tracker Mode (ascending/descending chimes + LED)
+//   3 clicks → Clear flash cache (buzzes "0/500")
+//   4 clicks → GPS Toggle / Broadcast
+//   5 clicks → Ping
 void handleMultiClick(uint8_t clicks)
 {
     switch (clicks) {
     case 1:
-        LOG_DEBUG("Button: 1 click — sending text message\n");
-        service.refreshLocalMeshNode();
+        LOG_DEBUG("Button: 1 click — manual waypoint log\n");
+        CachedPhoneTracker::logManualReading();
         break;
     case 2:
-        LOG_DEBUG("Button: 2 clicks — sending position\n");
-        service.refreshLocalMeshNode();
-        service.refreshMyNodeInfo();
-        break;
-    case 3:
-        LOG_DEBUG("Button: 3 clicks — shutdown\n");
-        powerFSM.trigger(EVENT_PRESS);
-        break;
-    case 4:
-        LOG_DEBUG("Button: 4 clicks — toggle tracker mode\n");
+        LOG_DEBUG("Button: 2 clicks — toggle tracker mode\n");
         CachedPhoneTracker::toggleTrackerMode();
         break;
+    case 3:
+        LOG_DEBUG("Button: 3 clicks — clear flash cache\n");
+        CachedPhoneTracker::clearCacheFromButton();
+        break;
+    case 4:
+        LOG_DEBUG("Button: 4 clicks — toggle GPS / broadcast\n");
+        CachedPhoneTracker::toggleGPS();
+        break;
     case 5:
-        LOG_DEBUG("Button: 5 clicks — reboot to DFU\n");
-        screen->startBluetoothPinScreen(0);
+        LOG_DEBUG("Button: 5 clicks — ping\n");
+        CachedPhoneTracker::sendPing();
         break;
     default:
         LOG_DEBUG("Button: %u clicks (unhandled)\n", clicks);
