@@ -2,6 +2,7 @@
 #include "MeshService.h"
 #include "NodeDB.h"
 #include "RTC.h"
+#include "SPILock.h"
 #include "buzz.h"
 #include "configuration.h"
 #include "main.h"
@@ -486,15 +487,18 @@ void CachedPhoneTracker::appendToCache(const meshtastic_Position &pos)
     pt.sats = (uint8_t)pos.sats_in_view;
     pt.flags = 0;
 
-    File f = FSCom.open(CACHE_PATH, FILE_O_WRITE);
-    if (!f)
-        return;
+    {
+        concurrency::LockGuard g(spiLock);
+        File f = FSCom.open(CACHE_PATH, FILE_O_WRITE);
+        if (!f)
+            return;
 
-    uint32_t writePos = (uint32_t)cache_head * sizeof(TrackPoint);
-    f.seek(writePos);
-    f.write((uint8_t *)&pt, sizeof(TrackPoint));
-    f.flush();
-    f.close();
+        uint32_t writePos = (uint32_t)cache_head * sizeof(TrackPoint);
+        f.seek(writePos);
+        f.write((uint8_t *)&pt, sizeof(TrackPoint));
+        f.flush();
+        f.close();
+    }
 
     cache_head = (cache_head + 1) % MAX_CACHED_POSITIONS;
     if (cache_count < MAX_CACHED_POSITIONS) {
@@ -509,6 +513,7 @@ void CachedPhoneTracker::appendToCache(const meshtastic_Position &pos)
 bool CachedPhoneTracker::readCachedEntry(uint16_t index, TrackPoint &pt)
 {
     memset(&pt, 0, sizeof(TrackPoint));
+    concurrency::LockGuard g(spiLock);
     if (index >= MAX_CACHED_POSITIONS || !FSCom.exists(CACHE_PATH))
         return false;
 
@@ -534,6 +539,7 @@ bool CachedPhoneTracker::readCachedEntry(uint16_t index, TrackPoint &pt)
 
 void CachedPhoneTracker::saveCacheIndex()
 {
+    concurrency::LockGuard g(spiLock);
     if (FSCom.exists(INDEX_PATH)) {
         FSCom.remove(INDEX_PATH);
     }
@@ -550,6 +556,7 @@ void CachedPhoneTracker::saveCacheIndex()
 
 void CachedPhoneTracker::loadCacheIndex()
 {
+    concurrency::LockGuard g(spiLock);
     if (!FSCom.exists(INDEX_PATH)) {
         cache_count = 0;
         cache_head = 0;
@@ -598,11 +605,14 @@ void CachedPhoneTracker::clearCache()
     cache_tail = 0;
     dumpActive = false;
     syncActive = false;
-    if (FSCom.exists(CACHE_PATH)) {
-        FSCom.remove(CACHE_PATH);
-    }
-    if (FSCom.exists(INDEX_PATH)) {
-        FSCom.remove(INDEX_PATH);
+    {
+        concurrency::LockGuard g(spiLock);
+        if (FSCom.exists(CACHE_PATH)) {
+            FSCom.remove(CACHE_PATH);
+        }
+        if (FSCom.exists(INDEX_PATH)) {
+            FSCom.remove(INDEX_PATH);
+        }
     }
     saveCacheIndex();
     LOG_INFO("CachedPhoneTracker: Cache cleared\n");
@@ -738,7 +748,7 @@ ProcessMessage CachedPhoneTracker::handleReceived(const meshtastic_MeshPacket &m
         point_count++;
 
         digitalWrite(PIN_LED1, !LED_STATE_ON);
-        playBeep();
+        playPointLoggedBeep();
         delay(60);
         digitalWrite(PIN_LED1, LED_STATE_ON);
 
