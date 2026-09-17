@@ -8,8 +8,8 @@
 #include <FSCommon.h>
 
 #define MAX_CACHED_POSITIONS 500
-#define TRACKER_LOG_INTERVAL_MS 60000
-#define TRACKER_POLL_INTERVAL_MS 3000
+#define TRACKER_LOG_INTERVAL_MS 60000 // Log once every 60 seconds (1 minute)
+#define TRACKER_POLL_INTERVAL_MS 3000 // Poll interval while tracker is idle
 
 #define CACHE_PATH "/tracker_points.dat"
 #define INDEX_PATH "/tracker_index.dat"
@@ -35,12 +35,12 @@ public:
     virtual ProcessMessage handleReceived(const meshtastic_MeshPacket &mp) override;
     static void toggleTrackerMode();
     static bool isTrackerModeActive() { return trackerModeActive; }
-    static void logManualReading();
-    static void clearCacheFromButton();
-    static void toggleGPS();
-    static void sendPing();
+    static void logManualReading();         // 1 click – capture waypoint
+    static void clearCacheFromButton();     // 3 clicks – clear cache + LED/buzz
+    static void toggleGPS();                // 4 clicks – GPS toggle/broadcast
+    static void sendPing();                 // 5 clicks – ping response
     void captureManualPoint();
-    void clearCache();
+    void clearCache();                      // instance – raw file removal
 
 protected:
     virtual int32_t runOnce() override;
@@ -55,12 +55,18 @@ private:
     uint32_t last_capture_ms;
     uint32_t point_count;
     bool lastBleConnected;
+
+    // Manual single-click reading state
     bool manualReadingPending;
     uint32_t manualReadingRequestedTime;
+
+    // Asynchronous non-blocking text dump state ($TRK lines for GPX / tracker_tool.py)
     bool dumpActive;
     uint16_t dumpCurIdx;
     uint16_t dumpTotalToSend;
     uint16_t dumpSentCount;
+
+    // Asynchronous non-blocking position sync state (native POSITION_APP packets for Meshtastic app)
     bool syncActive;
     uint16_t syncCurIdx;
     uint16_t syncTotalToSend;
