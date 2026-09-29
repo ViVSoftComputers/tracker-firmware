@@ -2,84 +2,68 @@
 
 #include "MeshModule.h"
 #include "concurrency/OSThread.h"
-#include "GPS.h"
-#include "GeoCoord.h"
-#include "BluetoothStatus.h"
-#include <FSCommon.h>
 
-#define MAX_CACHED_POSITIONS 500
-#define TRACKER_LOG_INTERVAL_MS 60000 // Log once every 60 seconds (1 minute)
-#define TRACKER_POLL_INTERVAL_MS 3000 // Poll interval while tracker is idle
+// -----------------------------------------------------------------------------
+// CachedPhoneTracker - Standalone GPS tracking module
+// -----------------------------------------------------------------------------
+// Tracks GPS positions offline and syncs to the Meshtastic Position Log
+// when a phone (BLE/Serial) reconnects.
+//
+// Features:
+//   - 60-second interval position logging
+//   - Ring buffer (2048 points) in LittleFS flat binary files
+//   - 1-5 click button gestures for control
+//   - Auto-sync to Meshtastic mobile app via POSITION_APP packets
+//   - SPILock concurrency guards on all flash access
+//   - Buzzer power gating for power efficiency
+//
+// Target: Seeed SenseCAP T1000-E (nRF52840)
+// Version: v3.0.2
+// -----------------------------------------------------------------------------
 
-#define CACHE_PATH "/tracker_points.dat"
-#define INDEX_PATH "/tracker_index.dat"
+struct TrackPoint;
 
-#pragma pack(push, 1)
-struct TrackPoint {
-    uint32_t timestamp;
-    int32_t lat_i;
-    int32_t lon_i;
-    int16_t alt;
-    uint16_t hdop;
-    uint8_t sats;
-    uint8_t flags;
-};
-#pragma pack(pop)
-
-class CachedPhoneTracker : public MeshModule, private concurrency::OSThread
+class CachedPhoneTracker : public concurrency::OSThread
 {
 public:
     CachedPhoneTracker();
 
-    virtual bool wantPacket(const meshtastic_MeshPacket *p) override;
-    virtual ProcessMessage handleReceived(const meshtastic_MeshPacket &mp) override;
-    static void toggleTrackerMode();
-    static bool isTrackerModeActive() { return trackerModeActive; }
-    static void logManualReading();         // 1 click – capture waypoint
-    static void clearCacheFromButton();     // 3 clicks – clear cache + LED/buzz
-    static void toggleGPS();                // 4 clicks – GPS toggle/broadcast
-    static void sendPing();                 // 5 clicks – ping response
-    void captureManualPoint();
-    void clearCache();                      // instance – raw file removal
+    // Module lifecycle
+    bool setup();
+    int32_t runOnce() override;
+
+    // Button gesture handler (dispatched from ButtonThread)
+    void handleMultipress();
+
+    // Get tracking state
+    bool isTracking() const { return _tracking_enabled; }
+    uint32_t getPointCount() const { return _point_count; }
+
+    // Admin message handler (for CLI interaction)
+    ProcessMessage handleReceived(const meshtastic_MeshPacket &mp);
 
 protected:
-    virtual int32_t runOnce() override;
+    bool _tracking_enabled;
 
 private:
-    static bool trackerModeActive;
-    uint16_t cache_count;
-    uint16_t cache_head;
-    uint16_t cache_tail;
-    int32_t last_lat_i;
-    int32_t last_lon_i;
-    uint32_t last_capture_ms;
-    uint32_t point_count;
-    bool lastBleConnected;
+    uint32_t _last_log_time;
+    uint32_t _write_index;
+    uint32_t _point_count;
+    bool _dump_in_progress;
+    bool _sync_pending;
 
-    // Manual single-click reading state
-    bool manualReadingPending;
-    uint32_t manualReadingRequestedTime;
+    void _logCurrentPosition();
+    void _writePoint(struct TrackPoint *tp);
+    void _rotateLog();
+    bool _readPoint(uint32_t index, struct TrackPoint *tp);
+    void _saveIndex();
+    void _loadIndex();
+    void _pushPendingPositions();
+    void _clearCache();
+    bool isPhoneConnected();
 
-    // Asynchronous non-blocking text dump state ($TRK lines for GPX / tracker_tool.py)
-    bool dumpActive;
-    uint16_t dumpCurIdx;
-    uint16_t dumpTotalToSend;
-    uint16_t dumpSentCount;
-
-    // Asynchronous non-blocking position sync state (native POSITION_APP packets for Meshtastic app)
-    bool syncActive;
-    uint16_t syncCurIdx;
-    uint16_t syncTotalToSend;
-    uint16_t syncSentCount;
-
-    void appendToCache(const meshtastic_Position &pos);
-    bool readCachedEntry(uint16_t index, TrackPoint &pt);
-    void saveCacheIndex();
-    void loadCacheIndex();
-    void startDump();
-    void startSync();
-    bool sendPositionToPhone(const TrackPoint &pt);
-    void replyText(const char *msg);
+    void _buzzerBeep(uint32_t duration_ms);
+    void _buzzerMelody(uint32_t count, uint32_t on_ms, uint32_t off_ms);
 };
 
 extern CachedPhoneTracker *cachedPhoneTracker;
