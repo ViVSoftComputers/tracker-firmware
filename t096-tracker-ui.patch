@@ -1,0 +1,5 @@
+diff --git a/src/graphics/Screen.cpp b/src/graphics/Screen.cpp
+index 2ea130b..b8ac2a4 100644
+--- a/src/graphics/Screen.cpp
++++ b/src/graphics/Screen.cpp
+@@ -1,0 +1,0 @@
