@@ -26,6 +26,9 @@ After flashing, restore configuration if needed:
 ```bash
 meshtastic --configure meshtastic_backup_config.yaml
 ```
+# There is also now a V2 of this project available 
+
+Here --> https://github.com/ViVSoftComputers/tracker-firmware-2
 
 ## Shared tracker behavior
 
