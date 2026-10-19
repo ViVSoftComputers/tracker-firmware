@@ -1,3 +1,7 @@
+# There is also now a V2 of this project available 
+
+Here --> https://github.com/ViVSoftComputers/tracker-firmware-2
+
 # Meshtastic Cached GPS Tracker Firmware
 
 Standalone GPS tracking firmware additions for two Meshtastic devices:
@@ -26,10 +30,6 @@ After flashing, restore configuration if needed:
 ```bash
 meshtastic --configure meshtastic_backup_config.yaml
 ```
-# There is also now a V2 of this project available 
-
-Here --> https://github.com/ViVSoftComputers/tracker-firmware-2
-
 ## Shared tracker behavior
 
 - GPS points are cached in LittleFS so logging can continue without the phone connected.
