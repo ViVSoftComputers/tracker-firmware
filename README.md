@@ -4,14 +4,7 @@ Here --> https://github.com/ViVSoftComputers/tracker-firmware-2
 
 # Meshtastic Cached GPS Tracker Firmware
 
-Standalone GPS tracking firmware additions for two Meshtastic devices:
-
-- **Seeed SenseCAP T1000-E** (nRF52840), with physical-button gestures and a compact tracker enclosure.
-- **Heltec T096**, with an on-device tracker status card and menu controls.
-
-Both targets use the `CachedPhoneTracker` module for locally cached GPS points and synchronization with the Meshtastic phone app. Device-specific controls and hardware details are called out separately below.
-
-> **Source-tree note:** This repository is a lightweight source overlay, not a complete Meshtastic firmware checkout. Apply the changes to the matching full Meshtastic source tree before building. Build environments and firmware behavior can depend on the Meshtastic revision and local patches; confirm the target and features in the checkout you are using.
+Standalone GPS tracking firmware.
 
 
 ### Links: (Note: As an affiliate, I earn from qualifying purchases)
